@@ -157,7 +157,7 @@ export default function Chat({ messages, onSendMessage, onSendFile }: ChatProps)
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Write a message..."
-                            className="flex-1 min-w-0 px-5 py-4 bg-gray-50 hover:bg-gray-100 focus:bg-white rounded-2xl text-[15px] border-2 border-transparent focus:border-blue-500 transition-all outline-none shadow-inner"
+                            className="flex-1 min-w-0 px-5 py-4 bg-gray-50 hover:bg-gray-100 focus:bg-white rounded-2xl text-[15px] border-2 border-transparent focus:border-blue-500 transition-all outline-none shadow-inner text-gray-900 placeholder-gray-400"
                         />
                         <motion.button
                             whileHover={{ scale: 1.05 }}
