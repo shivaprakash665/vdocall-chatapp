@@ -8,8 +8,11 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*", // In production, restrict this to your domain
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'], // Ensure compatibility across different network conditions
+  allowEIO3: true,                     // Support older clients if needed
 });
 
 io.on('connection', (socket) => {

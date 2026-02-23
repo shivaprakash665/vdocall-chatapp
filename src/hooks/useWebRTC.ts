@@ -37,7 +37,11 @@ export const useWebRTC = (roomId: string, username: string) => {
                 : 'http://localhost:5000');
 
         console.log('Connecting to signaling server at:', signalingUrl);
-        socketRef.current = io(signalingUrl);
+        socketRef.current = io(signalingUrl, {
+            path: '/socket.io', // Ensure the path matches the server
+            transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
+            reconnectionAttempts: 5,
+        });
 
         const createPeer = (stream: MediaStream) => {
             const peer = new RTCPeerConnection(ICE_SERVERS);
