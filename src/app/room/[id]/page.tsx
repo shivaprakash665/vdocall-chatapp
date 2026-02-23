@@ -4,6 +4,11 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, use } from 'react';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import Chat from '@/components/Chat';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff,
+    Copy, Check, UserPlus, Users, Loader2
+} from 'lucide-react';
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -61,150 +66,208 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     };
 
     return (
-        <div className="h-screen flex flex-col md:flex-row bg-gray-100 overflow-hidden font-sans">
+        <div className="h-screen flex flex-col md:flex-row bg-gray-950 overflow-hidden font-sans selection:bg-blue-500/30">
             {/* Main Video Area */}
-            <div className="flex-1 relative flex flex-col items-center justify-center p-4">
+            <div className="flex-1 relative flex flex-col items-center justify-center p-4 lg:p-6 pb-28 md:pb-6">
 
                 {/* Room ID & Info Header */}
-                <div className="absolute top-6 left-6 z-10 flex items-center space-x-3">
-                    <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm border border-white/20 flex items-center space-x-3">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Room ID:</span>
-                        <span className="text-sm font-mono font-bold text-gray-800">{roomId}</span>
-                        <button
+                <motion.div
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute top-6 left-6 z-10 flex items-center space-x-4"
+                >
+                    <div className="bg-black/40 backdrop-blur-xl px-5 py-2.5 rounded-2xl shadow-lg border border-white/10 flex items-center space-x-4 group transition-all hover:bg-black/60">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                            <Users className="w-3.5 h-3.5 mr-2 opacity-70" />
+                            Room
+                        </span>
+                        <span className="text-sm font-mono font-medium text-gray-200 select-all">{roomId}</span>
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
                             onClick={copyRoomId}
-                            className={`p-1.5 rounded-lg transition-all ${copied ? 'bg-green-100 text-green-600' : 'hover:bg-gray-100 text-gray-400 hover:text-blue-600'}`}
+                            className={`p-2 rounded-xl transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}
                         >
-                            {copied ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                            )}
-                        </button>
+                            <AnimatePresence mode="wait">
+                                {copied ? (
+                                    <motion.div key="check" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                                        <Check className="h-4 w-4" strokeWidth={3} />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div key="copy" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                                        <Copy className="h-4 w-4" />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </motion.button>
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Remote Video (Primary) */}
-                <div className="relative w-full h-full max-w-5xl bg-gray-900 rounded-3xl shadow-2xl overflow-hidden flex items-center justify-center border-4 border-white/10">
-                    {remoteStream ? (
-                        <>
-                            <video
-                                ref={remoteVideoRef}
-                                autoPlay
-                                playsInline
-                                className="w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-6 left-6 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
-                                <span className="text-white text-xs font-medium">Partner</span>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-gray-400 flex flex-col items-center space-y-6">
-                            <div className="relative">
-                                {peerConnected ? null : <div className="animate-ping absolute inset-0 rounded-full bg-blue-500/20" />}
-                                <div className="relative w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center border border-white/5">
-                                    {peerConnected ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                        </svg>
-                                    )}
+                <motion.div
+                    layout
+                    className="relative w-full h-full max-w-6xl bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden flex items-center justify-center border border-white/5"
+                >
+                    <AnimatePresence>
+                        {remoteStream ? (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4 }}
+                                className="w-full h-full relative"
+                            >
+                                <video
+                                    ref={remoteVideoRef}
+                                    autoPlay
+                                    playsInline
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center space-x-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="text-white text-[11px] font-bold uppercase tracking-widest">Partner</span>
                                 </div>
-                            </div>
-                            <div className="text-center px-4">
-                                <p className="text-lg font-semibold text-white">
-                                    {peerConnected ? 'Partner Connected (No Video)' : 'Waiting for partner...'}
-                                </p>
-                                <p className="text-sm text-gray-400 mt-2">
-                                    {peerConnected
-                                        ? 'Your partner has joined, but their camera is either off or denied permissions. You can still chat!\nIf this is an error, they may need to refresh the page or disable tracking protection.'
-                                        : 'They can join using your Room ID'}
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="text-gray-400 flex flex-col items-center space-y-8 p-8"
+                            >
+                                <div className="relative">
+                                    {!peerConnected && (
+                                        <motion.div
+                                            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+                                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                            className="absolute inset-0 rounded-full bg-blue-500/30 blur-xl"
+                                        />
+                                    )}
+                                    <div className="relative w-28 h-28 bg-gray-800/80 rounded-full flex items-center justify-center border border-white/5 shadow-2xl backdrop-blur-md">
+                                        {peerConnected ? (
+                                            <Users className="h-12 w-12 text-green-400" strokeWidth={1.5} />
+                                        ) : (
+                                            <UserPlus className="h-12 w-12 text-blue-400 opacity-80" strokeWidth={1.5} />
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-center max-w-sm">
+                                    <h3 className="text-xl font-semibold text-gray-100 flex items-center justify-center space-x-2">
+                                        {!peerConnected && <Loader2 className="w-5 h-5 animate-spin text-blue-500" />}
+                                        <span>{peerConnected ? 'Partner Connected' : 'Waiting for partner...'}</span>
+                                    </h3>
+                                    <p className="text-sm text-gray-400 mt-3 leading-relaxed">
+                                        {peerConnected
+                                            ? 'Your partner is here, but their camera is off. You can still chat!'
+                                            : 'Share the Room ID to start chatting.'}
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                    {/* Local Video (Floating Overlay) */}
-                    <div className="absolute top-6 right-6 w-48 h-36 md:w-64 md:h-48 bg-gray-800 rounded-2xl shadow-xl border-2 border-white/20 overflow-hidden transition-all hover:scale-105 group z-20">
+                    {/* Local Video (Floating PIP) */}
+                    <motion.div
+                        drag
+                        dragConstraints={{ top: 20, left: 20, right: 300, bottom: 300 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileDrag={{ scale: 1.05, cursor: "grabbing" }}
+                        className="absolute top-6 right-6 w-36 h-48 md:w-56 md:h-72 bg-gray-800 rounded-2xl shadow-2xl border border-white/10 overflow-hidden cursor-grab z-20 group"
+                    >
                         {localStream ? (
-                            <video
-                                ref={localVideoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : ''}`}
-                            />
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                className="w-full h-full p-1"
+                            >
+                                <video
+                                    ref={localVideoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className={`w-full h-full object-cover rounded-xl ${isVideoOff ? 'hidden' : ''}`}
+                                />
+                            </motion.div>
                         ) : null}
                         {(isVideoOff && !isScreenSharing) && (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" />
-                                </svg>
+                            <div className="w-full h-full flex items-center justify-center bg-gray-800 rounded-xl m-1 border border-white/5">
+                                <VideoOff className="h-10 w-10 text-gray-600" strokeWidth={1.5} />
                             </div>
                         )}
-                        <div className="absolute bottom-3 left-3 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-white text-[10px] font-medium">{username} (You)</span>
+                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <span className="text-white text-[10px] font-bold uppercase tracking-widest">{username} (You)</span>
                         </div>
                         {isScreenSharing && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-blue-600/20 backdrop-blur-[2px]">
-                                <span className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-lg">SHARING SCREEN</span>
+                            <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40 backdrop-blur-sm m-1 rounded-xl border border-blue-500/30">
+                                <span className="bg-blue-600 text-white text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-full shadow-2xl flex items-center">
+                                    <MonitorUp className="w-3 h-3 mr-2" />
+                                    Sharing
+                                </span>
                             </div>
                         )}
-                    </div>
+                    </motion.div>
+                </motion.div>
 
-                    {/* Controls Overlay */}
-                    <div className="absolute bottom-8 flex items-center space-x-6 z-30">
-                        <button
+                {/* Controls Overlay */}
+                <motion.div
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+                    className="absolute bottom-8 z-30"
+                >
+                    <div className="bg-white/10 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl flex items-center space-x-4 md:space-x-6">
+                        <motion.button
+                            whileHover={{ scale: 1.1, translateY: -2 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={toggleAudio}
-                            className={`p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-xl border border-white/30'}`}
+                            className={`p-4 rounded-2xl transition-colors shadow-lg flex items-center justify-center ${isMuted ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isMuted ? "Unmute Mic" : "Mute Mic"}
                         >
-                            {isMuted ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><line x1="1" y1="1" x2="23" y2="23" stroke="white" strokeWidth="2" /></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                            )}
-                        </button>
+                            {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1, translateY: -2 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={toggleVideo}
-                            className={`p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-xl border border-white/30'}`}
+                            className={`p-4 rounded-2xl transition-colors shadow-lg flex items-center justify-center ${isVideoOff ? 'bg-red-500 text-white shadow-red-500/20' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
                         >
-                            {isVideoOff ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><line x1="1" y1="1" x2="23" y2="23" stroke="white" strokeWidth="2" /></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                            )}
-                        </button>
+                            {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                        </motion.button>
 
-                        <button
+                        <div className="w-px h-10 bg-white/10" />
+
+                        <motion.button
+                            whileHover={{ scale: 1.1, translateY: -2 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={toggleScreenShare}
-                            className={`p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 ${isScreenSharing ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-xl border border-white/30'}`}
+                            className={`p-4 rounded-2xl transition-colors shadow-lg flex items-center justify-center ${isScreenSharing ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
                             title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        </button>
+                            <MonitorUp className="h-6 w-6" />
+                        </motion.button>
 
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.1, translateY: -2 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => window.location.href = '/'}
-                            className="p-4 rounded-full bg-red-600 text-white shadow-2xl transition-all hover:scale-110 active:scale-95 hover:bg-red-700 border border-white/20"
+                            className="p-4 px-8 rounded-2xl bg-red-600 text-white shadow-lg shadow-red-600/30 hover:bg-red-500 flex items-center justify-center transition-colors font-bold uppercase tracking-widest text-xs ml-4"
                             title="End Call"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg>
-                        </button>
+                            <PhoneOff className="h-5 w-5 mr-2" />
+                            Leave
+                        </motion.button>
                     </div>
-                </div>
+                </motion.div>
             </div>
 
             {/* Chat Area */}
-            <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-200">
+            <motion.div
+                initial={{ x: 300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="w-full md:w-[400px] h-full"
+            >
                 <Chat messages={messages} onSendMessage={sendMessage} onSendFile={sendFile} />
-            </div>
+            </motion.div>
         </div>
     );
 }
