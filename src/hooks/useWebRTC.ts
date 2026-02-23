@@ -28,9 +28,13 @@ export const useWebRTC = (roomId: string, username: string) => {
     const screenStreamRef = useRef<MediaStream | null>(null);
 
     useEffect(() => {
-        const signalingUrl = typeof window !== 'undefined'
-            ? `http://${window.location.hostname}:5000`
-            : 'http://localhost:5000';
+        // Vercel apps cannot natively host websockets via an Express server like this.
+        // You'll need to deploy signaling-server.js to a platform like Render or Railway,
+        // and then set that URL as NEXT_PUBLIC_SIGNALING_URL in your Vercel project settings.
+        const signalingUrl = process.env.NEXT_PUBLIC_SIGNALING_URL ||
+            (typeof window !== 'undefined'
+                ? `http://${window.location.hostname}:5000`
+                : 'http://localhost:5000');
 
         console.log('Connecting to signaling server at:', signalingUrl);
         socketRef.current = io(signalingUrl);
