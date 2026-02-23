@@ -39,6 +39,8 @@ export const useWebRTC = (roomId: string, username: string) => {
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
     const [messages, setMessages] = useState<Message[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [raisedHands, setRaisedHands] = useState<string[]>([]);
+    const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string }[]>([]);
 
     // Instead of a single peer connection, we need a map of peer connections (one for each other user)
     const socketRef = useRef<Socket | null>(null);
@@ -188,7 +190,31 @@ export const useWebRTC = (roomId: string, username: string) => {
                 });
 
                 socketRef.current?.on('chat-message', (data: Message) => {
-                    setMessages((prev) => [...prev, data]);
+                    if (data.message.startsWith('__SIGNAL__:')) {
+                        try {
+                            const payload = JSON.parse(data.message.replace('__SIGNAL__:', ''));
+                            if (payload.type === 'hand-raise') {
+                                setRaisedHands(prev => {
+                                    if (payload.raised) {
+                                        return prev.includes(data.senderId) ? prev : [...prev, data.senderId];
+                                    } else {
+                                        return prev.filter(id => id !== data.senderId);
+                                    }
+                                });
+                            } else if (payload.type === 'emoji') {
+                                const newEmoji = { id: crypto.randomUUID(), emoji: payload.emoji, senderId: data.senderId, senderName: data.senderName };
+                                setEmojiReactions(prev => [...prev, newEmoji]);
+                                // Auto remove emoji after 3 seconds
+                                setTimeout(() => {
+                                    setEmojiReactions(prev => prev.filter(e => e.id !== newEmoji.id));
+                                }, 3000);
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse signal message', e);
+                        }
+                    } else {
+                        setMessages((prev) => [...prev, data]);
+                    }
                 });
 
                 socketRef.current?.on('user-disconnected', (userId: string) => {
@@ -200,6 +226,9 @@ export const useWebRTC = (roomId: string, username: string) => {
                         delete newStreams[userId];
                         return newStreams;
                     });
+
+                    // Cleanup raised hands
+                    setRaisedHands(prev => prev.filter(id => id !== userId));
 
                     // Cleanup peer connection
                     const peer = peersRef.current.get(userId);
@@ -298,11 +327,44 @@ export const useWebRTC = (roomId: string, username: string) => {
         setMessages((prev) => [...prev, data]);
     };
 
+    const toggleHandRaise = (isRaised: boolean) => {
+        const payload = JSON.stringify({ type: 'hand-raise', raised: isRaised });
+        const data: Message = { message: `__SIGNAL__:${payload}`, roomId, senderName: username, senderId: 'me' };
+        socketRef.current?.emit('chat-message', { ...data, senderId: undefined });
+        setRaisedHands(prev => {
+            if (isRaised) return prev.includes('me') ? prev : [...prev, 'me'];
+            return prev.filter(id => id !== 'me');
+        });
+    };
+
+    const sendEmoji = (emoji: string) => {
+        const payload = JSON.stringify({ type: 'emoji', emoji });
+        const data: Message = { message: `__SIGNAL__:${payload}`, roomId, senderName: username, senderId: 'me' };
+        socketRef.current?.emit('chat-message', { ...data, senderId: undefined });
+        const newEmoji = { id: crypto.randomUUID(), emoji, senderId: 'me', senderName: username };
+        setEmojiReactions(prev => [...prev, newEmoji]);
+        setTimeout(() => {
+            setEmojiReactions(prev => prev.filter(e => e.id !== newEmoji.id));
+        }, 3000);
+    };
+
     const sendFile = (fileName: string, fileData: string) => {
         const data: Message = { message: `File: ${fileName}`, roomId, senderName: username, isFile: true, fileName, fileData, senderId: 'me' };
         socketRef.current?.emit('chat-message', { ...data, senderId: undefined });
         setMessages((prev) => [...prev, data]);
     }
 
-    return { localStream, remoteStreams, messages, sendMessage, sendFile, toggleScreenShare, isScreenSharing };
+    return {
+        localStream,
+        remoteStreams,
+        messages,
+        sendMessage,
+        sendFile,
+        toggleScreenShare,
+        isScreenSharing,
+        raisedHands,
+        toggleHandRaise,
+        emojiReactions,
+        sendEmoji
+    };
 };
