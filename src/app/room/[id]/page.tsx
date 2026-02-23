@@ -8,13 +8,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff,
     Copy, Check, UserPlus, Users, Loader2, Hand, Smile,
-    MessageSquare, X, Info
+    MessageSquare, X, Info, Moon, Sun
 } from 'lucide-react';
 
 const EMOJI_LIST = ['👍', '👎', '👏', '😂', '🎉', '😢', '🤔', '❤️'];
 
 // Subcomponent to render a single remote video tile
-const RemoteVideoTile = ({ stream, userId, name, isHandRaised }: { stream: MediaStream, userId: string, name?: string, isHandRaised: boolean }) => {
+const RemoteVideoTile = ({ stream, userId, name, isHandRaised, isDark }: { stream: MediaStream, userId: string, name?: string, isHandRaised: boolean, isDark: boolean }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
@@ -29,7 +29,7 @@ const RemoteVideoTile = ({ stream, userId, name, isHandRaised }: { stream: Media
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.4 }}
-            className={`w-full h-full relative bg-[#3C4043] rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isHandRaised ? 'border-blue-500' : 'border-transparent'}`}
+            className={`w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isHandRaised ? 'border-blue-500' : 'border-transparent'}`}
         >
             <video
                 ref={videoRef}
@@ -38,12 +38,12 @@ const RemoteVideoTile = ({ stream, userId, name, isHandRaised }: { stream: Media
                 className="w-full h-full object-cover"
             />
             {isHandRaised && (
-                <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce">
+                <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce z-20">
                     <Hand className="w-5 h-5 fill-current" />
                 </div>
             )}
-            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center space-x-2">
-                <span className="text-white text-sm font-medium">{name || 'Partner'}</span>
+            <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center space-x-2 z-20`}>
+                <span className="text-sm font-medium">{name || 'Partner'}</span>
             </div>
         </motion.div>
     );
@@ -67,7 +67,8 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         raisedHands,
         toggleHandRaise,
         emojiReactions,
-        sendEmoji
+        sendEmoji,
+        peerNames
     } = useWebRTC(roomId, username);
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -77,6 +78,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     const [currentTime, setCurrentTime] = useState('');
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+    // Theme state
+    const [isDark, setIsDark] = useState(true);
 
     useEffect(() => {
         const updateTime = () => {
@@ -124,7 +128,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     else if (peerConnectedCount >= 2) gridClass = 'grid-cols-2 grid-rows-2';
 
     return (
-        <div className="h-screen flex flex-col bg-[#202124] overflow-hidden font-sans selection:bg-blue-500/30">
+        <div className={`h-screen flex flex-col overflow-hidden font-sans selection:bg-blue-500/30 transition-colors duration-300 ${isDark ? 'bg-[#202124]' : 'bg-gray-100'}`}>
 
             {/* Top-Right Absolute Floating Copy Box if Chat is closed */}
             <AnimatePresence>
@@ -133,7 +137,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className="absolute top-4 right-4 z-40 bg-white shadow-xl rounded-xl p-4 flex flex-col space-y-3 w-72"
+                        className={`absolute top-4 right-4 z-40 shadow-xl rounded-xl p-4 flex flex-col space-y-3 w-72 ${isDark ? 'bg-white' : 'bg-white border border-gray-200'}`}
                     >
                         <h3 className="text-gray-900 font-medium text-sm">Meeting is ready</h3>
                         <div className="flex rounded-md bg-gray-100 p-1 items-center justify-between">
@@ -185,7 +189,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                         {/* Always show Local Video as a grid item instead of PIP in Meet style if there are others, but for simplicity we can make it a prominent tile */}
                         <motion.div
                             layout
-                            className={`w-full h-full relative bg-[#3C4043] rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'}`}
+                            className={`w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'}`}
                         >
                             {localStream ? (
                                 <video
@@ -197,7 +201,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                 />
                             ) : null}
                             {(isVideoOff && !isScreenSharing) && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-[#3C4043]">
+                                <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
                                     <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center text-white text-3xl font-medium shadow-lg">
                                         {username.charAt(0).toUpperCase()}
                                     </div>
@@ -221,8 +225,8 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     <MicOff className="w-4 h-4" />
                                 </div>
                             )}
-                            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg z-20">
-                                <span className="text-white text-sm font-medium">{username} (You)</span>
+                            <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg z-20`}>
+                                <span className="text-sm font-medium">{username} (You)</span>
                             </div>
                         </motion.div>
 
@@ -232,7 +236,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     key={userId}
                                     userId={userId}
                                     stream={stream}
+                                    name={peerNames[userId]}
                                     isHandRaised={raisedHands.includes(userId)}
+                                    isDark={isDark}
                                 />
                             ))}
                         </AnimatePresence>
@@ -240,11 +246,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                         {/* Waiting Placeholder if nobody is connected */}
                         {peerConnectedCount === 0 && (
                             <motion.div
-                                className="w-full h-full relative bg-[#3C4043] rounded-2xl shadow-xl border border-white/5 flex flex-col items-center justify-center"
+                                className={`w-full h-full relative ${isDark ? 'bg-[#3C4043] border-white/5' : 'bg-white border-gray-200'} rounded-2xl shadow-xl border flex flex-col items-center justify-center`}
                             >
-                                <Users className="w-16 h-16 text-gray-500 mb-4" />
-                                <h2 className="text-xl text-white font-medium">Waiting for others to join</h2>
-                                <p className="text-gray-400 mt-2">Send them the room link to connect</p>
+                                <Users className={`w-16 h-16 mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+                                <h2 className={`text-xl font-medium ${isDark ? 'text-white' : 'text-gray-800'}`}>Waiting for others to join</h2>
+                                <p className={`mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Send them the room link to connect</p>
                             </motion.div>
                         )}
                     </motion.div>
@@ -258,7 +264,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                             animate={{ width: 360, opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
                             transition={{ duration: 0.3 }}
-                            className="h-full bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+                            className={`h-full ${isDark ? 'bg-white' : 'bg-white'} rounded-2xl overflow-hidden shadow-2xl flex flex-col`}
                         >
                             <div className="flex items-center justify-between p-4 border-b">
                                 <h2 className="text-lg font-medium text-gray-900 flex items-center">
@@ -282,11 +288,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             </div>
 
             {/* Google Meet Bottom Control Bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-20 bg-[#202124] flex items-center justify-between px-6 z-40">
+            <div className={`absolute bottom-0 left-0 right-0 h-20 ${isDark ? 'bg-[#202124]' : 'bg-white border-t border-gray-200'} flex items-center justify-between px-6 z-40 transition-colors duration-300`}>
                 {/* Left: Time & Room ID */}
-                <div className="flex items-center space-x-4 text-white font-medium text-sm hidden md:flex">
+                <div className={`flex items-center space-x-4 font-medium text-sm hidden md:flex ${isDark ? 'text-white' : 'text-gray-800'}`}>
                     <span>{currentTime}</span>
-                    <span className="text-gray-400">|</span>
+                    <span className={isDark ? 'text-gray-400' : 'text-gray-300'}>|</span>
                     <span>{roomId}</span>
                 </div>
 
@@ -294,7 +300,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 <div className="flex absolute left-1/2 -translate-x-1/2 items-center space-x-3">
                     <button
                         onClick={handleAudioToggle}
-                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isMuted ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : 'bg-[#3C4043] text-white hover:bg-[#4A4E51]'}`}
+                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isMuted ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
                         title={isMuted ? "Turn on microphone" : "Turn off microphone"}
                     >
                         {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
@@ -302,7 +308,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
                     <button
                         onClick={handleVideoToggle}
-                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isVideoOff ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : 'bg-[#3C4043] text-white hover:bg-[#4A4E51]'}`}
+                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isVideoOff ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
                         title={isVideoOff ? "Turn on camera" : "Turn off camera"}
                     >
                         {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
@@ -310,7 +316,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
                     <button
                         onClick={toggleScreenShare}
-                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isScreenSharing ? 'bg-[#8AB4F8] text-gray-900 hover:bg-[#9EBEF9]' : 'bg-[#3C4043] text-white hover:bg-[#4A4E51]'}`}
+                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isScreenSharing ? 'bg-[#8AB4F8] text-gray-900 hover:bg-[#9EBEF9]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
                         title={isScreenSharing ? "Stop presenting" : "Present now"}
                     >
                         <MonitorUp className="h-5 w-5" />
@@ -318,7 +324,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
                     <button
                         onClick={() => toggleHandRaise(!isMyHandRaised)}
-                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isMyHandRaised ? 'bg-[#8AB4F8] text-gray-900 hover:bg-[#9EBEF9]' : 'bg-[#3C4043] text-white hover:bg-[#4A4E51]'}`}
+                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isMyHandRaised ? 'bg-[#8AB4F8] text-gray-900 hover:bg-[#9EBEF9]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
                         title={isMyHandRaised ? "Lower Hand" : "Raise Hand"}
                     >
                         <Hand className={`h-5 w-5 ${isMyHandRaised ? 'fill-current' : ''}`} />
@@ -327,7 +333,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <div className="relative">
                         <button
                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${showEmojiPicker ? 'bg-[#4A4E51] text-white' : 'bg-[#3C4043] text-white hover:bg-[#4A4E51]'}`}
+                            className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${showEmojiPicker ? (isDark ? 'bg-[#4A4E51] text-white' : 'bg-gray-300 text-gray-900') : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
                             title="Send a reaction"
                         >
                             <Smile className="h-5 w-5" />
@@ -339,7 +345,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-[#3C4043] p-2 rounded-full shadow-2xl flex space-x-1 border border-white/10"
+                                    className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-4 ${isDark ? 'bg-[#3C4043] border-white/10' : 'bg-white border-gray-200'} p-2 rounded-full shadow-2xl flex space-x-1 border`}
                                 >
                                     {EMOJI_LIST.map(emoji => (
                                         <button
@@ -348,7 +354,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                                 sendEmoji(emoji);
                                                 setShowEmojiPicker(false);
                                             }}
-                                            className="w-10 h-10 text-2xl hover:scale-125 hover:bg-white/10 rounded-full transition flex items-center justify-center"
+                                            className={`w-10 h-10 text-2xl hover:scale-125 rounded-full transition flex items-center justify-center ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
                                         >
                                             {emoji}
                                         </button>
@@ -370,13 +376,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 {/* Right: Info, Chat Icons */}
                 <div className="flex items-center space-x-2">
                     <button
+                        onClick={() => setIsDark(!isDark)}
+                        className={`p-3 rounded-full transition flex items-center justify-center ${isDark ? 'text-white hover:bg-[#3C4043]' : 'text-gray-800 hover:bg-gray-100'}`}
+                        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    >
+                        {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                    </button>
+
+                    <button
                         onClick={() => setIsChatOpen(!isChatOpen)}
-                        className={`p-3 rounded-full transition flex items-center justify-center relative ${isChatOpen ? 'bg-[#a8c7fa]/20 text-[#a8c7fa]' : 'text-white hover:bg-[#3C4043]'}`}
+                        className={`p-3 rounded-full transition flex items-center justify-center relative ${isChatOpen ? (isDark ? 'bg-[#a8c7fa]/20 text-[#a8c7fa]' : 'bg-blue-100 text-blue-600') : (isDark ? 'text-white hover:bg-[#3C4043]' : 'text-gray-800 hover:bg-gray-100')}`}
                         title="Chat with everyone"
                     >
                         <MessageSquare className="h-6 w-6" />
                         {messages.length > 0 && !isChatOpen && (
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-[#202124]" />
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-transparent" />
                         )}
                     </button>
                 </div>

@@ -41,6 +41,7 @@ export const useWebRTC = (roomId: string, username: string) => {
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
     const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string }[]>([]);
+    const [peerNames, setPeerNames] = useState<Record<string, string>>({});
 
     // Instead of a single peer connection, we need a map of peer connections (one for each other user)
     const socketRef = useRef<Socket | null>(null);
@@ -148,6 +149,15 @@ export const useWebRTC = (roomId: string, username: string) => {
             }
         };
 
+        const broadcastUserInfo = () => {
+            const payload = JSON.stringify({ type: 'user-info', name: username });
+            socketRef.current?.emit('chat-message', {
+                message: `__SIGNAL__:${payload}`,
+                roomId,
+                senderName: username,
+            });
+        };
+
         const init = async () => {
             let stream: MediaStream | null = null;
             try {
@@ -167,9 +177,16 @@ export const useWebRTC = (roomId: string, username: string) => {
 
                 socketRef.current?.emit('join-room', roomId);
 
+                // Introduce ourselves to anyone already in the room
+                broadcastUserInfo();
+
                 // When a new user connects, EXISTING users in the room will initiate a call to them
                 socketRef.current?.on('user-connected', (userId: string) => {
                     setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
+
+                    // The new user might not know our name yet, so re-broadcast our info when someone joins
+                    broadcastUserInfo();
+
                     if (peersRef.current.size < 3) { // Support max 4 users (me + 3 others)
                         initiateCall(userId, stream);
                     } else {
@@ -208,6 +225,11 @@ export const useWebRTC = (roomId: string, username: string) => {
                                 setTimeout(() => {
                                     setEmojiReactions(prev => prev.filter(e => e.id !== newEmoji.id));
                                 }, 3000);
+                            } else if (payload.type === 'user-info') {
+                                setPeerNames(prev => ({
+                                    ...prev,
+                                    [data.senderId]: payload.name
+                                }));
                             }
                         } catch (e) {
                             console.error('Failed to parse signal message', e);
@@ -218,7 +240,8 @@ export const useWebRTC = (roomId: string, username: string) => {
                 });
 
                 socketRef.current?.on('user-disconnected', (userId: string) => {
-                    setMessages(prev => [...prev, { message: 'A user left the room', senderName: 'System', senderId: 'system' }]);
+                    const disconnectedName = peerNames[userId] || 'A user';
+                    setMessages(prev => [...prev, { message: `${disconnectedName} left the room`, senderName: 'System', senderId: 'system' }]);
 
                     // Cleanup remote streams
                     setRemoteStreams(prev => {
@@ -229,6 +252,13 @@ export const useWebRTC = (roomId: string, username: string) => {
 
                     // Cleanup raised hands
                     setRaisedHands(prev => prev.filter(id => id !== userId));
+
+                    // Cleanup peer name
+                    setPeerNames(prev => {
+                        const newNames = { ...prev };
+                        delete newNames[userId];
+                        return newNames;
+                    });
 
                     // Cleanup peer connection
                     const peer = peersRef.current.get(userId);
@@ -263,7 +293,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
             }
         };
-    }, [roomId]);
+    }, [roomId, username, peerNames]);
 
     const toggleScreenShare = async () => {
         if (!isScreenSharing) {
@@ -365,6 +395,7 @@ export const useWebRTC = (roomId: string, username: string) => {
         raisedHands,
         toggleHandRaise,
         emojiReactions,
-        sendEmoji
+        sendEmoji,
+        peerNames
     };
 };
