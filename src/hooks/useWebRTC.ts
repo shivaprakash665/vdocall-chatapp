@@ -26,6 +26,7 @@ export const useWebRTC = (roomId: string, username: string) => {
     const socketRef = useRef<Socket | null>(null);
     const peerRef = useRef<RTCPeerConnection | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
+    const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
 
     useEffect(() => {
         // Vercel apps cannot natively host websockets via an Express server like this.
@@ -42,8 +43,6 @@ export const useWebRTC = (roomId: string, username: string) => {
             transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
             reconnectionAttempts: 5,
         });
-
-        const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
 
         const createPeer = (stream: MediaStream | null) => {
             const peer = new RTCPeerConnection(ICE_SERVERS);
