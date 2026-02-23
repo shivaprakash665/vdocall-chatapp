@@ -5,6 +5,22 @@ const ICE_SERVERS: RTCConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        }
     ],
 };
 
@@ -23,6 +39,7 @@ export const useWebRTC = (roomId: string, username: string) => {
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [peerConnected, setPeerConnected] = useState(false);
     const socketRef = useRef<Socket | null>(null);
     const peerRef = useRef<RTCPeerConnection | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
@@ -54,8 +71,18 @@ export const useWebRTC = (roomId: string, username: string) => {
             };
 
             peer.ontrack = (e) => {
-                console.log('Received remote track');
-                setRemoteStream(e.streams[0]);
+                console.log('Received remote track', e.streams);
+                if (e.streams && e.streams.length > 0) {
+                    setRemoteStream(e.streams[0]);
+                } else {
+                    setRemoteStream(prev => {
+                        if (prev) {
+                            prev.addTrack(e.track);
+                            return prev;
+                        }
+                        return new MediaStream([e.track]);
+                    });
+                }
             };
 
             if (stream) {
@@ -118,17 +145,26 @@ export const useWebRTC = (roomId: string, username: string) => {
             }
 
             const setupSocketListeners = () => {
+                socketRef.current?.off('user-connected');
+                socketRef.current?.off('offer');
+                socketRef.current?.off('answer');
+                socketRef.current?.off('ice-candidate');
+                socketRef.current?.off('chat-message');
+                socketRef.current?.off('user-disconnected');
+
                 socketRef.current?.emit('join-room', roomId);
                 console.log('Joined room:', roomId);
 
                 socketRef.current?.on('user-connected', (userId: string) => {
                     console.log('User connected:', userId);
+                    setPeerConnected(true);
                     setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
                     initiateCall(stream);
                 });
 
                 socketRef.current?.on('offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
                     console.log('Received offer');
+                    setPeerConnected(true);
                     await handleOffer(offer, stream);
                 });
 
@@ -147,6 +183,7 @@ export const useWebRTC = (roomId: string, username: string) => {
 
                 socketRef.current?.on('user-disconnected', (userId: string) => {
                     console.log('User disconnected:', userId);
+                    setPeerConnected(false);
                     setMessages(prev => [...prev, { message: 'A user left the room', senderName: 'System', senderId: 'system' }]);
                     setRemoteStream(null);
                     if (peerRef.current) {
@@ -245,5 +282,5 @@ export const useWebRTC = (roomId: string, username: string) => {
         setMessages((prev) => [...prev, data]);
     }
 
-    return { localStream, remoteStream, messages, sendMessage, sendFile, toggleScreenShare, isScreenSharing };
+    return { localStream, remoteStream, messages, sendMessage, sendFile, toggleScreenShare, isScreenSharing, peerConnected };
 };
