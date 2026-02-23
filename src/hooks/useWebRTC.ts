@@ -43,7 +43,9 @@ export const useWebRTC = (roomId: string, username: string) => {
             reconnectionAttempts: 5,
         });
 
-        const createPeer = (stream: MediaStream) => {
+        const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+
+        const createPeer = (stream: MediaStream | null) => {
             const peer = new RTCPeerConnection(ICE_SERVERS);
 
             peer.onicecandidate = (e) => {
@@ -57,21 +59,35 @@ export const useWebRTC = (roomId: string, username: string) => {
                 setRemoteStream(e.streams[0]);
             };
 
-            stream.getTracks().forEach(track => peer.addTrack(track, stream));
+            if (stream) {
+                stream.getTracks().forEach(track => peer.addTrack(track, stream));
+            }
 
             return peer;
         };
 
-        const initiateCall = async (stream: MediaStream) => {
+        const initiateCall = async (stream: MediaStream | null) => {
             peerRef.current = createPeer(stream);
             const offer = await peerRef.current.createOffer();
             await peerRef.current.setLocalDescription(offer);
             socketRef.current?.emit('offer', { offer, roomId });
         };
 
-        const handleOffer = async (offer: RTCSessionDescriptionInit, stream: MediaStream) => {
+        const processQueuedCandidates = () => {
+            if (peerRef.current && peerRef.current.remoteDescription) {
+                iceCandidateQueueRef.current.forEach(candidate => {
+                    peerRef.current?.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add queued candidate:', e));
+                });
+                iceCandidateQueueRef.current = [];
+            }
+        };
+
+        const handleOffer = async (offer: RTCSessionDescriptionInit, stream: MediaStream | null) => {
             peerRef.current = createPeer(stream);
             await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+
+            processQueuedCandidates();
+
             const answer = await peerRef.current.createAnswer();
             await peerRef.current.setLocalDescription(answer);
             socketRef.current?.emit('answer', { answer, roomId });
@@ -80,73 +96,77 @@ export const useWebRTC = (roomId: string, username: string) => {
         const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
             if (peerRef.current) {
                 await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+                processQueuedCandidates();
             }
         };
 
         const handleNewICECandidate = (candidate: RTCIceCandidateInit) => {
-            if (peerRef.current) {
-                peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e));
+            if (peerRef.current && peerRef.current.remoteDescription) {
+                peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add candidate:', e));
+            } else {
+                iceCandidateQueueRef.current.push(candidate);
             }
         };
 
         const init = async () => {
+            let stream: MediaStream | null = null;
             try {
                 console.log('Requesting media devices...');
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 setLocalStream(stream);
+            } catch (err) {
+                console.warn('Error accessing media devices. Continuing without video/audio.', err);
+            }
 
-                const setupSocketListeners = () => {
-                    socketRef.current?.emit('join-room', roomId);
-                    console.log('Joined room:', roomId);
+            const setupSocketListeners = () => {
+                socketRef.current?.emit('join-room', roomId);
+                console.log('Joined room:', roomId);
 
-                    socketRef.current?.on('user-connected', (userId: string) => {
-                        console.log('User connected:', userId);
-                        setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
-                        initiateCall(stream);
-                    });
-
-                    socketRef.current?.on('offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
-                        console.log('Received offer');
-                        await handleOffer(offer, stream);
-                    });
-
-                    socketRef.current?.on('answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
-                        console.log('Received answer');
-                        await handleAnswer(answer);
-                    });
-
-                    socketRef.current?.on('ice-candidate', ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                        handleNewICECandidate(candidate);
-                    });
-
-                    socketRef.current?.on('chat-message', (data: Message) => {
-                        setMessages((prev) => [...prev, data]);
-                    });
-
-                    socketRef.current?.on('user-disconnected', (userId: string) => {
-                        console.log('User disconnected:', userId);
-                        setMessages(prev => [...prev, { message: 'A user left the room', senderName: 'System', senderId: 'system' }]);
-                        setRemoteStream(null);
-                        if (peerRef.current) {
-                            peerRef.current.close();
-                            peerRef.current = null;
-                        }
-                    });
-                };
-
-                if (socketRef.current?.connected) {
-                    setupSocketListeners();
-                } else {
-                    socketRef.current?.on('connect', setupSocketListeners);
-                }
-
-                socketRef.current?.on('connect_error', (err) => {
-                    console.error('Signaling connection error:', err);
+                socketRef.current?.on('user-connected', (userId: string) => {
+                    console.log('User connected:', userId);
+                    setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
+                    initiateCall(stream);
                 });
 
-            } catch (err) {
-                console.error('Error accessing media devices:', err);
+                socketRef.current?.on('offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
+                    console.log('Received offer');
+                    await handleOffer(offer, stream);
+                });
+
+                socketRef.current?.on('answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
+                    console.log('Received answer');
+                    await handleAnswer(answer);
+                });
+
+                socketRef.current?.on('ice-candidate', ({ candidate }: { candidate: RTCIceCandidateInit }) => {
+                    handleNewICECandidate(candidate);
+                });
+
+                socketRef.current?.on('chat-message', (data: Message) => {
+                    setMessages((prev) => [...prev, data]);
+                });
+
+                socketRef.current?.on('user-disconnected', (userId: string) => {
+                    console.log('User disconnected:', userId);
+                    setMessages(prev => [...prev, { message: 'A user left the room', senderName: 'System', senderId: 'system' }]);
+                    setRemoteStream(null);
+                    if (peerRef.current) {
+                        peerRef.current.close();
+                        peerRef.current = null;
+                        iceCandidateQueueRef.current = [];
+                    }
+                });
+            };
+
+            if (socketRef.current?.connected) {
+                setupSocketListeners();
+            } else {
+                socketRef.current?.on('connect', setupSocketListeners);
             }
+
+            socketRef.current?.on('connect_error', (err) => {
+                console.error('Signaling connection error:', err);
+            });
         };
 
         init();
