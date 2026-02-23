@@ -36,51 +36,51 @@ interface Message {
 
 export const useWebRTC = (roomId: string, username: string) => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
     const [messages, setMessages] = useState<Message[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
-    const [peerConnected, setPeerConnected] = useState(false);
+
+    // Instead of a single peer connection, we need a map of peer connections (one for each other user)
     const socketRef = useRef<Socket | null>(null);
-    const peerRef = useRef<RTCPeerConnection | null>(null);
+    const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
     const screenStreamRef = useRef<MediaStream | null>(null);
-    const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+    const iceCandidateQueuesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
     useEffect(() => {
-        // Vercel apps cannot natively host websockets via an Express server like this.
-        // You'll need to deploy signaling-server.js to a platform like Render or Railway,
-        // and then set that URL as NEXT_PUBLIC_SIGNALING_URL in your Vercel project settings.
         const signalingUrl = process.env.NEXT_PUBLIC_SIGNALING_URL ||
             (typeof window !== 'undefined'
                 ? `http://${window.location.hostname}:5000`
                 : 'http://localhost:5000');
 
-        console.log('Connecting to signaling server at:', signalingUrl);
         socketRef.current = io(signalingUrl, {
-            path: '/socket.io', // Ensure the path matches the server
-            transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
+            path: '/socket.io',
+            transports: ['websocket', 'polling'],
             reconnectionAttempts: 5,
         });
 
-        const createPeer = (stream: MediaStream | null) => {
+        const createPeer = (targetUserId: string, stream: MediaStream | null) => {
             const peer = new RTCPeerConnection(ICE_SERVERS);
 
             peer.onicecandidate = (e) => {
                 if (e.candidate) {
-                    socketRef.current?.emit('ice-candidate', { candidate: e.candidate, roomId });
+                    socketRef.current?.emit('ice-candidate', { candidate: e.candidate, roomId: targetUserId });
                 }
             };
 
             peer.ontrack = (e) => {
-                console.log('Received remote track', e.streams);
                 if (e.streams && e.streams.length > 0) {
-                    setRemoteStream(e.streams[0]);
+                    setRemoteStreams(prev => ({
+                        ...prev,
+                        [targetUserId]: e.streams[0]
+                    }));
                 } else {
-                    setRemoteStream(prev => {
-                        if (prev) {
-                            prev.addTrack(e.track);
-                            return prev;
+                    setRemoteStreams(prev => {
+                        const existingStream = prev[targetUserId];
+                        if (existingStream) {
+                            existingStream.addTrack(e.track);
+                            return { ...prev, [targetUserId]: existingStream };
                         }
-                        return new MediaStream([e.track]);
+                        return { ...prev, [targetUserId]: new MediaStream([e.track]) };
                     });
                 }
             };
@@ -92,52 +92,63 @@ export const useWebRTC = (roomId: string, username: string) => {
             return peer;
         };
 
-        const initiateCall = async (stream: MediaStream | null) => {
-            peerRef.current = createPeer(stream);
-            const offer = await peerRef.current.createOffer();
-            await peerRef.current.setLocalDescription(offer);
-            socketRef.current?.emit('offer', { offer, roomId });
+        const initiateCall = async (targetUserId: string, stream: MediaStream | null) => {
+            const peer = createPeer(targetUserId, stream);
+            peersRef.current.set(targetUserId, peer);
+
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+
+            socketRef.current?.emit('offer', { offer, roomId: targetUserId });
         };
 
-        const processQueuedCandidates = () => {
-            if (peerRef.current && peerRef.current.remoteDescription) {
-                iceCandidateQueueRef.current.forEach(candidate => {
-                    peerRef.current?.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add queued candidate:', e));
+        const processQueuedCandidates = (targetUserId: string) => {
+            const peer = peersRef.current.get(targetUserId);
+            const queue = iceCandidateQueuesRef.current.get(targetUserId) || [];
+
+            if (peer && peer.remoteDescription) {
+                queue.forEach(candidate => {
+                    peer.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add queued candidate:', e));
                 });
-                iceCandidateQueueRef.current = [];
+                iceCandidateQueuesRef.current.set(targetUserId, []);
             }
         };
 
-        const handleOffer = async (offer: RTCSessionDescriptionInit, stream: MediaStream | null) => {
-            peerRef.current = createPeer(stream);
-            await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+        const handleOffer = async (offer: RTCSessionDescriptionInit, senderId: string, stream: MediaStream | null) => {
+            const peer = createPeer(senderId, stream);
+            peersRef.current.set(senderId, peer);
 
-            processQueuedCandidates();
+            await peer.setRemoteDescription(new RTCSessionDescription(offer));
+            processQueuedCandidates(senderId);
 
-            const answer = await peerRef.current.createAnswer();
-            await peerRef.current.setLocalDescription(answer);
-            socketRef.current?.emit('answer', { answer, roomId });
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+
+            socketRef.current?.emit('answer', { answer, roomId: senderId });
         };
 
-        const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
-            if (peerRef.current) {
-                await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-                processQueuedCandidates();
+        const handleAnswer = async (answer: RTCSessionDescriptionInit, senderId: string) => {
+            const peer = peersRef.current.get(senderId);
+            if (peer) {
+                await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                processQueuedCandidates(senderId);
             }
         };
 
-        const handleNewICECandidate = (candidate: RTCIceCandidateInit) => {
-            if (peerRef.current && peerRef.current.remoteDescription) {
-                peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add candidate:', e));
+        const handleNewICECandidate = (candidate: RTCIceCandidateInit, senderId: string) => {
+            const peer = peersRef.current.get(senderId);
+            if (peer && peer.remoteDescription) {
+                peer.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('Failed to add candidate:', e));
             } else {
-                iceCandidateQueueRef.current.push(candidate);
+                const queue = iceCandidateQueuesRef.current.get(senderId) || [];
+                queue.push(candidate);
+                iceCandidateQueuesRef.current.set(senderId, queue);
             }
         };
 
         const init = async () => {
             let stream: MediaStream | null = null;
             try {
-                console.log('Requesting media devices...');
                 stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 setLocalStream(stream);
             } catch (err) {
@@ -153,28 +164,27 @@ export const useWebRTC = (roomId: string, username: string) => {
                 socketRef.current?.off('user-disconnected');
 
                 socketRef.current?.emit('join-room', roomId);
-                console.log('Joined room:', roomId);
 
+                // When a new user connects, EXISTING users in the room will initiate a call to them
                 socketRef.current?.on('user-connected', (userId: string) => {
-                    console.log('User connected:', userId);
-                    setPeerConnected(true);
                     setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
-                    initiateCall(stream);
+                    if (peersRef.current.size < 3) { // Support max 4 users (me + 3 others)
+                        initiateCall(userId, stream);
+                    } else {
+                        console.warn('Room is full (max 4 users allowed). Ignoring connection.');
+                    }
                 });
 
-                socketRef.current?.on('offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
-                    console.log('Received offer');
-                    setPeerConnected(true);
-                    await handleOffer(offer, stream);
+                socketRef.current?.on('offer', async ({ offer, senderId }: { offer: RTCSessionDescriptionInit, senderId: string }) => {
+                    await handleOffer(offer, senderId, stream);
                 });
 
-                socketRef.current?.on('answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
-                    console.log('Received answer');
-                    await handleAnswer(answer);
+                socketRef.current?.on('answer', async ({ answer, senderId }: { answer: RTCSessionDescriptionInit, senderId: string }) => {
+                    await handleAnswer(answer, senderId);
                 });
 
-                socketRef.current?.on('ice-candidate', ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                    handleNewICECandidate(candidate);
+                socketRef.current?.on('ice-candidate', ({ candidate, senderId }: { candidate: RTCIceCandidateInit, senderId: string }) => {
+                    handleNewICECandidate(candidate, senderId);
                 });
 
                 socketRef.current?.on('chat-message', (data: Message) => {
@@ -182,15 +192,22 @@ export const useWebRTC = (roomId: string, username: string) => {
                 });
 
                 socketRef.current?.on('user-disconnected', (userId: string) => {
-                    console.log('User disconnected:', userId);
-                    setPeerConnected(false);
                     setMessages(prev => [...prev, { message: 'A user left the room', senderName: 'System', senderId: 'system' }]);
-                    setRemoteStream(null);
-                    if (peerRef.current) {
-                        peerRef.current.close();
-                        peerRef.current = null;
-                        iceCandidateQueueRef.current = [];
+
+                    // Cleanup remote streams
+                    setRemoteStreams(prev => {
+                        const newStreams = { ...prev };
+                        delete newStreams[userId];
+                        return newStreams;
+                    });
+
+                    // Cleanup peer connection
+                    const peer = peersRef.current.get(userId);
+                    if (peer) {
+                        peer.close();
+                        peersRef.current.delete(userId);
                     }
+                    iceCandidateQueuesRef.current.delete(userId);
                 });
             };
 
@@ -205,11 +222,14 @@ export const useWebRTC = (roomId: string, username: string) => {
             });
         };
 
-        init();
+        if (roomId) {
+            init();
+        }
 
         return () => {
             socketRef.current?.disconnect();
-            if (peerRef.current) peerRef.current.close();
+            peersRef.current.forEach(peer => peer.close());
+            peersRef.current.clear();
             if (screenStreamRef.current) {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
             }
@@ -223,13 +243,14 @@ export const useWebRTC = (roomId: string, username: string) => {
                 screenStreamRef.current = screenStream;
                 const screenTrack = screenStream.getVideoTracks()[0];
 
-                if (peerRef.current) {
-                    const senders = peerRef.current.getSenders();
+                // Replace track for ALL connected peers
+                peersRef.current.forEach(peer => {
+                    const senders = peer.getSenders();
                     const videoSender = senders.find(s => s.track?.kind === 'video');
                     if (videoSender) {
                         videoSender.replaceTrack(screenTrack);
                     }
-                }
+                });
 
                 screenTrack.onended = () => {
                     stopScreenShare();
@@ -255,13 +276,14 @@ export const useWebRTC = (roomId: string, username: string) => {
             const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             const videoTrack = videoStream.getVideoTracks()[0];
 
-            if (peerRef.current) {
-                const senders = peerRef.current.getSenders();
+            // Revert track for ALL connected peers
+            peersRef.current.forEach(peer => {
+                const senders = peer.getSenders();
                 const videoSender = senders.find(s => s.track?.kind === 'video');
                 if (videoSender) {
                     videoSender.replaceTrack(videoTrack);
                 }
-            }
+            });
 
             setLocalStream(videoStream);
             setIsScreenSharing(false);
@@ -272,7 +294,7 @@ export const useWebRTC = (roomId: string, username: string) => {
 
     const sendMessage = (message: string) => {
         const data: Message = { message, roomId, senderName: username, senderId: 'me' };
-        socketRef.current?.emit('chat-message', { ...data, senderId: undefined }); // Server will assign senderId or we use custom one
+        socketRef.current?.emit('chat-message', { ...data, senderId: undefined });
         setMessages((prev) => [...prev, data]);
     };
 
@@ -282,5 +304,5 @@ export const useWebRTC = (roomId: string, username: string) => {
         setMessages((prev) => [...prev, data]);
     }
 
-    return { localStream, remoteStream, messages, sendMessage, sendFile, toggleScreenShare, isScreenSharing, peerConnected };
+    return { localStream, remoteStreams, messages, sendMessage, sendFile, toggleScreenShare, isScreenSharing };
 };

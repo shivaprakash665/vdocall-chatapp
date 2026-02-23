@@ -10,6 +10,39 @@ import {
     Copy, Check, UserPlus, Users, Loader2
 } from 'lucide-react';
 
+// Subcomponent to render a single remote video tile
+const RemoteVideoTile = ({ stream, userId }: { stream: MediaStream, userId: string }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4 }}
+            className="w-full h-full relative bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/5"
+        >
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center space-x-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-white text-[11px] font-bold uppercase tracking-widest">Partner</span>
+            </div>
+        </motion.div>
+    );
+};
+
+
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const searchParams = useSearchParams();
@@ -18,17 +51,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
     const {
         localStream,
-        remoteStream,
+        remoteStreams,
         messages,
         sendMessage,
         sendFile,
         toggleScreenShare,
-        isScreenSharing,
-        peerConnected
+        isScreenSharing
     } = useWebRTC(roomId, username);
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -38,12 +69,6 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             localVideoRef.current.srcObject = localStream;
         }
     }, [localStream]);
-
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-        }
-    }, [remoteStream]);
 
     const toggleAudio = () => {
         if (localStream) {
@@ -64,6 +89,14 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
+
+    const remotePeers = Object.entries(remoteStreams);
+    const peerConnectedCount = remotePeers.length;
+
+    // Determine grid layout based on number of participants
+    let gridClass = 'grid-cols-1 grid-rows-1';
+    if (peerConnectedCount === 2) gridClass = 'md:grid-cols-2 md:grid-rows-1 grid-cols-1 grid-rows-2';
+    else if (peerConnectedCount >= 3) gridClass = 'grid-cols-2 grid-rows-2';
 
     return (
         <div className="h-screen flex flex-col md:flex-row bg-gray-950 overflow-hidden font-sans selection:bg-blue-500/30">
@@ -121,67 +154,45 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     </div>
                 </motion.div>
 
-                {/* Remote Video (Primary) */}
+                {/* Remote Video Grid */}
                 <motion.div
                     layout
-                    className="relative w-full h-full max-w-6xl bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden flex items-center justify-center border border-white/5"
+                    className={`relative w-full h-full max-w-7xl max-h-[85vh] grid justify-center items-center gap-4 ${gridClass}`}
                 >
                     <AnimatePresence>
-                        {remoteStream ? (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.4 }}
-                                className="w-full h-full relative"
-                            >
-                                <video
-                                    ref={remoteVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center space-x-2">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-white text-[11px] font-bold uppercase tracking-widest">Partner</span>
-                                </div>
-                            </motion.div>
+                        {peerConnectedCount > 0 ? (
+                            remotePeers.map(([userId, stream]) => (
+                                <RemoteVideoTile key={userId} userId={userId} stream={stream} />
+                            ))
                         ) : (
                             <motion.div
                                 exit={{ opacity: 0, scale: 0.9 }}
-                                className="text-gray-400 flex flex-col items-center space-y-8 p-8"
+                                className="col-span-full text-gray-400 flex flex-col items-center justify-center space-y-8 p-8 h-full bg-gray-900 rounded-[2rem] border border-white/5 shadow-2xl"
                             >
                                 <div className="relative">
-                                    {!peerConnected && (
-                                        <motion.div
-                                            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
-                                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                            className="absolute inset-0 rounded-full bg-blue-500/30 blur-xl"
-                                        />
-                                    )}
+                                    <motion.div
+                                        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                        className="absolute inset-0 rounded-full bg-blue-500/30 blur-xl"
+                                    />
                                     <div className="relative w-28 h-28 bg-gray-800/80 rounded-full flex items-center justify-center border border-white/5 shadow-2xl backdrop-blur-md">
-                                        {peerConnected ? (
-                                            <Users className="h-12 w-12 text-green-400" strokeWidth={1.5} />
-                                        ) : (
-                                            <UserPlus className="h-12 w-12 text-blue-400 opacity-80" strokeWidth={1.5} />
-                                        )}
+                                        <UserPlus className="h-12 w-12 text-blue-400 opacity-80" strokeWidth={1.5} />
                                     </div>
                                 </div>
                                 <div className="text-center max-w-sm">
                                     <h3 className="text-xl font-semibold text-gray-100 flex items-center justify-center space-x-2">
-                                        {!peerConnected && <Loader2 className="w-5 h-5 animate-spin text-blue-500" />}
-                                        <span>{peerConnected ? 'Partner Connected' : 'Waiting for partner...'}</span>
+                                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                        <span>Waiting for participants...</span>
                                     </h3>
                                     <p className="text-sm text-gray-400 mt-3 leading-relaxed">
-                                        {peerConnected
-                                            ? 'Your partner is here, but their camera is off. You can still chat!'
-                                            : 'Share the Room ID to start chatting.'}
+                                        Share the Room ID or WhatsApp link to invite up to 3 other people.
                                     </p>
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    {/* Local Video (Floating PIP) */}
+                    {/* Local Video (Floating PIP or grid tile if needed, keeping as PIP for consistency) */}
                     <motion.div
                         drag
                         dragConstraints={{ top: 20, left: 20, right: 300, bottom: 300 }}
