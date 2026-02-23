@@ -42,6 +42,7 @@ export const useWebRTC = (roomId: string, username: string) => {
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
     const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string }[]>([]);
     const [peerNames, setPeerNames] = useState<Record<string, string>>({});
+    const peerNamesRef = useRef<Record<string, string>>({});
 
     // Instead of a single peer connection, we need a map of peer connections (one for each other user)
     const socketRef = useRef<Socket | null>(null);
@@ -226,10 +227,11 @@ export const useWebRTC = (roomId: string, username: string) => {
                                     setEmojiReactions(prev => prev.filter(e => e.id !== newEmoji.id));
                                 }, 3000);
                             } else if (payload.type === 'user-info') {
-                                setPeerNames(prev => ({
-                                    ...prev,
-                                    [data.senderId]: payload.name
-                                }));
+                                setPeerNames(prev => {
+                                    const next = { ...prev, [data.senderId]: payload.name };
+                                    peerNamesRef.current = next;
+                                    return next;
+                                });
                             }
                         } catch (e) {
                             console.error('Failed to parse signal message', e);
@@ -240,7 +242,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                 });
 
                 socketRef.current?.on('user-disconnected', (userId: string) => {
-                    const disconnectedName = peerNames[userId] || 'A user';
+                    const disconnectedName = peerNamesRef.current[userId] || 'A user';
                     setMessages(prev => [...prev, { message: `${disconnectedName} left the room`, senderName: 'System', senderId: 'system' }]);
 
                     // Cleanup remote streams
@@ -257,6 +259,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                     setPeerNames(prev => {
                         const newNames = { ...prev };
                         delete newNames[userId];
+                        peerNamesRef.current = newNames;
                         return newNames;
                     });
 
@@ -293,7 +296,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
             }
         };
-    }, [roomId, username, peerNames]);
+    }, [roomId, username]);
 
     const toggleScreenShare = async () => {
         if (!isScreenSharing) {
