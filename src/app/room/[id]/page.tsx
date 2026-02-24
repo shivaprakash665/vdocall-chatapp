@@ -78,6 +78,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     } = useWebRTC(roomId, username, hasSubmittedName);
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
+    const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [copied, setCopied] = useState(false);
     const [currentTime, setCurrentTime] = useState('');
@@ -104,11 +105,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
         }
-    }, [localStream]);
+    }, [localStream, joinState]);
 
     const handleAudioToggle = () => {
         if (localStream) {
             localStream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
+            setIsMuted(!isMuted);
         }
     };
 
@@ -160,6 +162,16 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                         </button>
                     </form>
                 </div>
+            </div>
+        );
+    }
+
+    if (joinState === 'idle') {
+        return (
+            <div className={`h-screen flex flex-col items-center justify-center font-sans ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-6" />
+                <h2 className="text-2xl font-semibold mb-2">Connecting...</h2>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Requesting camera and microphone access.</p>
             </div>
         );
     }
@@ -335,7 +347,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     <Hand className="w-5 h-5 fill-current" />
                                 </div>
                             )}
-                            {localStream?.getAudioTracks()[0] && !localStream.getAudioTracks()[0].enabled && (
+                            {isMuted && (
                                 <div className="absolute top-4 right-4 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20">
                                     <MicOff className="w-4 h-4" />
                                 </div>
@@ -415,10 +427,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 <div className="flex absolute left-1/2 -translate-x-1/2 items-center space-x-3">
                     <button
                         onClick={handleAudioToggle}
-                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${localStream?.getAudioTracks()[0] && !localStream.getAudioTracks()[0].enabled ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
-                        title={localStream?.getAudioTracks()[0] && !localStream.getAudioTracks()[0].enabled ? "Turn on microphone" : "Turn off microphone"}
+                        className={`p-3.5 rounded-full transition shadow-sm flex items-center justify-center ${isMuted ? 'bg-[#EA4335] text-white hover:bg-[#D93025]' : (isDark ? 'bg-[#3C4043] text-white hover:bg-[#4A4E51]' : 'bg-gray-200 text-gray-800 hover:bg-gray-300')}`}
+                        title={isMuted ? "Turn on microphone" : "Turn off microphone"}
                     >
-                        {localStream?.getAudioTracks()[0] && !localStream.getAudioTracks()[0].enabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                        {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                     </button>
 
                     <button
