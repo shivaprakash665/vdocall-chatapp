@@ -1,130 +1,158 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { Video, Keyboard, Plus, HelpCircle, MessageSquareWarning, Settings, Grip, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Video, ArrowRight, Sparkles, Moon, Sun } from 'lucide-react';
 
 export default function LandingPage() {
+  const [name, setName] = useState('');
   const [roomId, setRoomId] = useState('');
-  const [currentTime, setCurrentTime] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      const dateStr = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-      setCurrentTime(`${timeStr} • ${dateStr}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const handleCreateRoom = () => {
+    if (!name.trim()) return alert('Please enter your name');
     const newRoomId = uuidv4();
-    router.push(`/room/${newRoomId}`);
+    router.push(`/room/${newRoomId}?name=${encodeURIComponent(name.trim())}`);
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomId.trim()) return;
-    router.push(`/room/${roomId.trim()}`);
+    if (!name.trim() || !roomId.trim()) return alert('Please enter your name and a Room ID');
+    router.push(`/room/${roomId.trim()}?name=${encodeURIComponent(name.trim())}`);
   };
 
   return (
-    <main className="min-h-screen bg-white text-gray-800 font-sans flex flex-col selection:bg-blue-100">
-      {/* Top Navigation Bar */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white hover:border-gray-100 transition-colors">
-        <div className="flex items-center space-x-2">
-          <button className="p-3 rounded-full hover:bg-gray-100 transition-colors">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-          <div className="flex items-center space-x-2 cursor-pointer select-none">
-            <div className="flex -space-x-1">
-              <div className="w-4 h-4 rounded bg-blue-500 z-10"></div>
-              <div className="w-4 h-4 rounded bg-green-500 z-0 transform translate-y-1"></div>
-              <div className="w-4 h-4 rounded bg-yellow-500 -z-10 transform -translate-y-1"></div>
-              <div className="w-4 h-4 rounded bg-red-500 -z-20 transform translate-y-2"></div>
-            </div>
-            <span className="text-xl text-gray-600 font-medium tracking-tight mt-0.5">Google Meet</span>
+    <main className={`min-h-screen flex flex-col transition-colors duration-500 font-sans selection:bg-blue-500/30 relative overflow-hidden ${isDark ? 'bg-[#060913]' : 'bg-gray-50'}`}>
+
+      {/* Theme Toggle */}
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={() => setIsDark(!isDark)}
+          className={`p-3 rounded-full transition-all shadow-md flex items-center justify-center ${isDark ? 'bg-[#121622] text-[#8A93A6] border border-[#1F2633] hover:text-white' : 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200'}`}
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+        </button>
+      </div>
+
+      {/* Decorative Background Elements */}
+      <div className={`absolute top-[10%] left-[20%] w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-colors duration-1000 ${isDark ? 'bg-[#18347D]/20' : 'bg-blue-400/20'}`} />
+      <div className={`absolute bottom-[10%] right-[20%] w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-colors duration-1000 ${isDark ? 'bg-[#2E1452]/20' : 'bg-purple-400/20'}`} />
+
+      <div className="flex-1 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className={`max-w-[420px] w-full rounded-[28px] p-8 md:p-10 space-y-8 relative z-10 transition-colors duration-500 border ${isDark ? 'bg-[#121622] border-[#222836] shadow-2xl shadow-black/50' : 'bg-white border-gray-200 shadow-xl'}`}
+        >
+          <div className="text-center space-y-4">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, type: "spring" }}
+              className="w-16 h-16 bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] rounded-2xl mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(42,101,255,0.3)] mb-6"
+            >
+              <Video className="w-8 h-8 text-white" />
+            </motion.div>
+            <h1 className={`text-[32px] font-bold tracking-tight transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>Connecto</h1>
+            <p className={`text-[15px] font-medium transition-colors ${isDark ? 'text-[#8A93A6]' : 'text-gray-600'}`}>Secure, peer-to-peer video calls.</p>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-1 sm:space-x-3 text-gray-600">
-          <span className="text-sm mr-4 hidden md:block">{currentTime}</span>
-          <button className="p-2.5 rounded-full hover:bg-gray-100 transition-colors hidden sm:block"><HelpCircle className="w-5 h-5" /></button>
-          <button className="p-2.5 rounded-full hover:bg-gray-100 transition-colors hidden sm:block"><MessageSquareWarning className="w-5 h-5" /></button>
-          <button className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"><Settings className="w-5 h-5" /></button>
-          <div className="w-px h-6 bg-gray-200 mx-2 hidden sm:block"></div>
-          <button className="p-2.5 rounded-full hover:bg-gray-100 transition-colors hidden sm:block"><Grip className="w-5 h-5" /></button>
-          <button className="ml-2 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-medium shadow-sm hover:ring-2 ring-offset-2 ring-blue-500 transition-shadow">
-            S
-          </button>
-        </div>
-      </header>
+          <div className="space-y-6 pt-4">
+            <div className="space-y-3">
+              <label htmlFor="name" className={`block text-[11px] font-bold uppercase tracking-[0.15em] pl-1 transition-colors ${isDark ? 'text-[#60697A]' : 'text-gray-500'}`}>
+                Your Display Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={`w-full px-5 py-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-medium border ${isDark ? 'bg-[#060913] border-[#1F2633] text-white placeholder-[#4A5568] hover:border-[#323D52]' : 'bg-black/5 border-gray-200 text-gray-900 placeholder-gray-400 hover:border-gray-300'}`}
+                placeholder="e.g. Alex"
+                autoComplete="off"
+              />
+            </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <aside className="w-[180px] hidden lg:flex flex-col py-4 border-r border-transparent">
-          <nav className="space-y-1 px-3">
-            <button className="w-full flex items-center space-x-3 bg-blue-600/10 text-blue-700 px-4 py-3 rounded-full font-medium text-sm transition-colors">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              <span>Meetings</span>
-            </button>
-            <button className="w-full flex items-center space-x-3 hover:bg-gray-100 text-gray-700 px-4 py-3 rounded-full font-medium text-sm transition-colors">
-              <Video className="w-5 h-5" />
-              <span>Calls</span>
-            </button>
-          </nav>
-        </aside>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:mr-[180px]">
-          <div className="max-w-[750px] w-full text-center space-y-2 mb-8">
-            <h1 className="text-[44px] sm:text-[52px] leading-[1.2] text-[#1f2937] font-normal tracking-wide mb-6">
-              Video calls and meetings for<br />everyone
-            </h1>
-            <p className="text-[18px] sm:text-[22px] text-[#5f6368] mb-12 max-w-2xl mx-auto font-normal">
-              Connect, collaborate, and celebrate from anywhere with Google Meet
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+            <div className={`grid grid-cols-2 gap-2 p-1.5 rounded-xl border transition-colors ${isDark ? 'bg-[#060913] border-[#1F2633]' : 'bg-gray-100/50 border-gray-200'}`}>
               <button
-                onClick={handleCreateRoom}
-                className="w-full sm:w-auto px-6 py-[14px] bg-[#1a73e8] hover:bg-[#1b6ad3] text-white rounded-[4px] font-medium text-[15px] transition-colors shadow-sm flex items-center justify-center space-x-2"
+                onClick={() => setIsJoining(false)}
+                className={`py-3 rounded-lg text-[14px] font-medium transition-all duration-300 ${!isJoining ? (isDark ? 'bg-[#242A38] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : (isDark ? 'text-[#60697A] hover:text-[#A0AABA] hover:bg-transparent' : 'text-gray-500 hover:text-gray-700 hover:bg-black/5')}`}
               >
-                <Video className="w-[18px] h-[18px]" strokeWidth={2.2} />
-                <span>New meeting</span>
+                Create Room
               </button>
-
-              <form onSubmit={handleJoinRoom} className="flex w-full sm:w-auto mt-2 sm:mt-0">
-                <div className="relative flex-1 sm:w-[280px]">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Keyboard className="h-5 w-5 text-[#5f6368]" strokeWidth={1.5} />
-                  </div>
-                  <input
-                    type="text"
-                    value={roomId}
-                    onChange={(e) => setRoomId(e.target.value)}
-                    className="w-full pl-11 pr-4 py-[14px] border border-gray-400 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[4px] focus:outline-none transition-all text-[#3c4043] placeholder-[#5f6368] text-[16px]"
-                    placeholder="Enter a code or link"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!roomId.trim()}
-                  className={`ml-2 px-6 py-[14px] rounded-[4px] font-medium text-[15px] transition-colors ${roomId.trim() ? 'text-[#1a73e8] hover:bg-[#f3f7fe]' : 'text-[#9aa0a6] bg-transparent'}`}
-                >
-                  Join
-                </button>
-              </form>
+              <button
+                onClick={() => setIsJoining(true)}
+                className={`py-3 rounded-lg text-[14px] font-medium transition-all duration-300 ${isJoining ? (isDark ? 'bg-[#242A38] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : (isDark ? 'text-[#60697A] hover:text-[#A0AABA] hover:bg-transparent' : 'text-gray-500 hover:text-gray-700 hover:bg-black/5')}`}
+              >
+                Join Room
+              </button>
             </div>
 
-            <div className="hidden sm:block mt-24 border-t border-gray-200 w-full max-w-[600px] mx-auto pt-6"></div>
+            <AnimatePresence mode="wait">
+              {isJoining ? (
+                <motion.form
+                  key="join"
+                  initial={{ opacity: 0, height: 0, y: -10 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -10 }}
+                  onSubmit={handleJoinRoom}
+                  className="space-y-4"
+                >
+                  <div className="space-y-3">
+                    <label htmlFor="roomId" className={`block text-[11px] font-bold uppercase tracking-[0.15em] pl-1 transition-colors ${isDark ? 'text-[#60697A]' : 'text-gray-500'}`}>
+                      Room ID
+                    </label>
+                    <input
+                      type="text"
+                      id="roomId"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      className={`w-full px-5 py-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm border ${isDark ? 'bg-[#060913] border-[#1F2633] text-white placeholder-[#4A5568] hover:border-[#323D52]' : 'bg-black/5 border-gray-200 text-gray-900 placeholder-gray-400 hover:border-gray-300'}`}
+                      placeholder="Paste ID here"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    className="w-full py-4 text-[15px] rounded-xl bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] text-white font-semibold tracking-wide shadow-[0_8px_30px_rgba(42,101,255,0.2)] hover:shadow-[0_8px_30px_rgba(42,101,255,0.4)] transition-all flex items-center justify-center space-x-2"
+                  >
+                    <span>Join Call</span>
+                    <ArrowRight className="w-[18px] h-[18px]" />
+                  </motion.button>
+                </motion.form>
+              ) : (
+                <motion.div
+                  key="create"
+                  initial={{ opacity: 0, height: 0, y: 10 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: 10 }}
+                >
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleCreateRoom}
+                    className="w-full py-4 text-[15px] rounded-xl bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] text-white font-semibold tracking-wide shadow-[0_8px_30px_rgba(42,101,255,0.2)] hover:shadow-[0_8px_30px_rgba(42,101,255,0.4)] transition-all flex items-center justify-center space-x-2"
+                  >
+                    <Sparkles className="w-[18px] h-[18px]" />
+                    <span>Start New Call</span>
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+
+          <p className={`text-center text-[11px] font-medium pt-8 border-t transition-colors ${isDark ? 'text-[#60697A] border-[#1F2633]' : 'text-gray-400 border-gray-200'}`}>
+            Peer-to-peer connection • No data stored on servers
+          </p>
+        </motion.div>
       </div>
     </main>
   );
