@@ -53,10 +53,17 @@ const RemoteVideoTile = ({ stream, userId, name, isHandRaised, isDark }: { strea
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const searchParams = useSearchParams();
-    const username = searchParams.get('name') || 'Anonymous';
+    const initialName = searchParams.get('name') || '';
+    const [username, setUsername] = useState(initialName);
+    const [hasSubmittedName, setHasSubmittedName] = useState(!!initialName);
     const roomId = id;
 
     const {
+        joinState,
+        isHost,
+        knockingGuests,
+        acceptGuest,
+        denyGuest,
         localStream,
         remoteStreams,
         messages,
@@ -69,7 +76,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         emojiReactions,
         sendEmoji,
         peerNames
-    } = useWebRTC(roomId, username);
+    } = useWebRTC(roomId, username, hasSubmittedName);
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -130,8 +137,102 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     if (peerConnectedCount === 1) gridClass = 'md:grid-cols-2 grid-cols-1';
     else if (peerConnectedCount >= 2) gridClass = 'grid-cols-2 grid-rows-2';
 
+    if (!hasSubmittedName) {
+        return (
+            <div className={`h-screen flex items-center justify-center font-sans ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+                <div className={`p-8 rounded-2xl shadow-xl w-full max-w-sm border ${isDark ? 'bg-gray-900 border-white/10' : 'bg-white border-gray-200'}`}>
+                    <h2 className="text-2xl font-bold mb-6 text-center">Join Room</h2>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (username.trim()) setHasSubmittedName(true);
+                    }}>
+                        <div className="mb-4">
+                            <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Your Name</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-black/50 border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                                placeholder="Enter your name"
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition">
+                            Ask to Join
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    if (joinState === 'waiting') {
+        return (
+            <div className={`h-screen flex flex-col items-center justify-center font-sans ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-6" />
+                <h2 className="text-2xl font-semibold mb-2">Asking to join...</h2>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>You'll join the call when someone lets you in.</p>
+            </div>
+        );
+    }
+
+    if (joinState === 'denied') {
+        return (
+            <div className={`h-screen flex flex-col items-center justify-center font-sans ${isDark ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+                    <X className="w-8 h-8 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-semibold mb-2">You can't join this call</h2>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-6`}>The host denied your request to join.</p>
+                <button onClick={() => window.location.href = '/'} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
+                    Return to Home
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className={`h-screen flex flex-col overflow-hidden font-sans selection:bg-blue-500/30 transition-colors duration-300 ${isDark ? 'bg-[#202124]' : 'bg-gray-100'}`}>
+
+            {/* Host Notifications for Knocking Guests */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col space-y-2 w-full max-w-sm px-4 pointer-events-none">
+                <AnimatePresence>
+                    {isHost && knockingGuests.map(guest => (
+                        <motion.div
+                            key={guest.id}
+                            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className={`pointer-events-auto shadow-2xl rounded-xl p-4 flex items-center justify-between border ${isDark ? 'bg-[#3C4043] border-white/10' : 'bg-white border-gray-200'}`}
+                        >
+                            <div className="flex items-center space-x-3 truncate mr-4">
+                                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium shrink-0">
+                                    {guest.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="truncate">
+                                    <p className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{guest.name}</p>
+                                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>wants to join this call</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-2 shrink-0">
+                                <button
+                                    onClick={() => denyGuest(guest.id)}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${isDark ? 'text-blue-400 hover:bg-blue-400/10' : 'text-blue-600 hover:bg-blue-50'}`}
+                                >
+                                    Deny
+                                </button>
+                                <button
+                                    onClick={() => acceptGuest(guest.id)}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition shadow-sm"
+                                >
+                                    Admit
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
 
             {/* Top-Right Absolute Floating Copy Box if Chat is closed */}
             <AnimatePresence>

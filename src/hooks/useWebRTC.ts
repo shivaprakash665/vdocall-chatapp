@@ -34,7 +34,11 @@ interface Message {
     fileData?: string;
 }
 
-export const useWebRTC = (roomId: string, username: string) => {
+export const useWebRTC = (roomId: string, username: string, shouldConnect: boolean = true) => {
+    const [joinState, setJoinState] = useState<'idle' | 'waiting' | 'joined' | 'denied'>('idle');
+    const [isHost, setIsHost] = useState(false);
+    const [knockingGuests, setKnockingGuests] = useState<{ id: string, name: string }[]>([]);
+
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
     const [messages, setMessages] = useState<Message[]>([]);
@@ -176,12 +180,33 @@ export const useWebRTC = (roomId: string, username: string) => {
                 socketRef.current?.off('chat-message');
                 socketRef.current?.off('user-disconnected');
 
-                socketRef.current?.emit('join-room', roomId);
+                socketRef.current?.off('guest-knocking');
+                socketRef.current?.off('guest-denied');
+                socketRef.current?.off('waiting-for-host');
+                socketRef.current?.off('room-joined');
 
-                // Introduce ourselves to anyone already in the room
-                broadcastUserInfo();
+                socketRef.current?.emit('request-join-room', { roomId, name: username });
 
-                // When a new user connects, EXISTING users in the room will initiate a call to them
+                socketRef.current?.on('waiting-for-host', () => {
+                    setJoinState('waiting');
+                });
+
+                socketRef.current?.on('room-joined', (data: { isHost: boolean, roomId: string }) => {
+                    setJoinState('joined');
+                    setIsHost(data.isHost);
+                    // Introduce ourselves to anyone already in the room
+                    broadcastUserInfo();
+                });
+
+                socketRef.current?.on('guest-denied', () => {
+                    setJoinState('denied');
+                });
+
+                socketRef.current?.on('guest-knocking', (data: { guestId: string, guestName: string }) => {
+                    setKnockingGuests(prev => [...prev, { id: data.guestId, name: data.guestName }]);
+                });
+
+                // When a new user connects (AFTER being accepted), EXISTING users in the room will initiate a call to them
                 socketRef.current?.on('user-connected', (userId: string) => {
                     setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
 
@@ -284,7 +309,7 @@ export const useWebRTC = (roomId: string, username: string) => {
             });
         };
 
-        if (roomId) {
+        if (roomId && shouldConnect && joinState === 'idle') {
             init();
         }
 
@@ -296,7 +321,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
             }
         };
-    }, [roomId, username]);
+    }, [roomId, username, shouldConnect, joinState]);
 
     const toggleScreenShare = async () => {
         if (!isScreenSharing) {
@@ -387,7 +412,22 @@ export const useWebRTC = (roomId: string, username: string) => {
         setMessages((prev) => [...prev, data]);
     }
 
+    const acceptGuest = (guestId: string) => {
+        socketRef.current?.emit('accept-guest', { roomId, guestId });
+        setKnockingGuests(prev => prev.filter(g => g.id !== guestId));
+    };
+
+    const denyGuest = (guestId: string) => {
+        socketRef.current?.emit('deny-guest', { roomId, guestId });
+        setKnockingGuests(prev => prev.filter(g => g.id !== guestId));
+    };
+
     return {
+        joinState,
+        isHost,
+        knockingGuests,
+        acceptGuest,
+        denyGuest,
         localStream,
         remoteStreams,
         messages,
