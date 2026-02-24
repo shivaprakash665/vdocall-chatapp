@@ -32,6 +32,9 @@ io.on('connection', (socket) => {
       socket.join(roomId);
       console.log(`User ${socket.id} created and joined room ${roomId} as host`);
       socket.emit('room-joined', { isHost: true, roomId });
+    } else if (room.hosts.has(socket.id) || room.guests.has(socket.id)) {
+      // User is already recognized in this room
+      socket.emit('room-joined', { isHost: room.hosts.has(socket.id), roomId });
     } else {
       // Room exists, users in it are hosts. Send knocking signal.
       console.log(`User ${socket.id} (${name}) is knocking on room ${roomId}`);

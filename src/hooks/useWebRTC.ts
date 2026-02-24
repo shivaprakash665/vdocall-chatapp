@@ -43,6 +43,7 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
     const [messages, setMessages] = useState<Message[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [screenSharingUsers, setScreenSharingUsers] = useState<string[]>([]);
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
     const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string, x?: number }[]>([]);
     const [peerNames, setPeerNames] = useState<Record<string, string>>({});
@@ -64,11 +65,13 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                 ? `http://${window.location.hostname}:5000`
                 : 'http://localhost:5000');
 
-        socketRef.current = io(signalingUrl, {
+        const socket = io(signalingUrl, {
             path: '/socket.io',
             transports: ['websocket', 'polling'],
             reconnectionAttempts: 5,
         });
+        socketRef.current = socket;
+        let isActive = true;
 
         const createPeer = (targetUserId: string, stream: MediaStream | null) => {
             const peer = new RTCPeerConnection(ICE_SERVERS);
@@ -171,27 +174,33 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
             let stream: MediaStream | null = null;
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                if (!isActive) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
                 setLocalStream(stream);
             } catch (err) {
                 console.warn('Error accessing media devices. Continuing without video/audio.', err);
             }
 
+            if (!isActive) return;
+
             const setupSocketListeners = () => {
-                socketRef.current?.off('user-connected');
-                socketRef.current?.off('offer');
-                socketRef.current?.off('answer');
-                socketRef.current?.off('ice-candidate');
-                socketRef.current?.off('chat-message');
-                socketRef.current?.off('user-disconnected');
+                socket.off('user-connected');
+                socket.off('offer');
+                socket.off('answer');
+                socket.off('ice-candidate');
+                socket.off('chat-message');
+                socket.off('user-disconnected');
 
-                socketRef.current?.off('guest-knocking');
-                socketRef.current?.off('guest-denied');
-                socketRef.current?.off('waiting-for-host');
-                socketRef.current?.off('room-joined');
+                socket.off('guest-knocking');
+                socket.off('guest-denied');
+                socket.off('waiting-for-host');
+                socket.off('room-joined');
 
-                socketRef.current?.emit('request-join-room', { roomId, name: username });
+                socket.emit('request-join-room', { roomId, name: username });
 
-                socketRef.current?.on('waiting-for-host', () => {
+                socket.on('waiting-for-host', () => {
                     setJoinState('waiting');
                 });
 
@@ -261,6 +270,14 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                                     peerNamesRef.current = next;
                                     return next;
                                 });
+                            } else if (payload.type === 'screen-share') {
+                                setScreenSharingUsers(prev => {
+                                    if (payload.sharing) {
+                                        return prev.includes(data.senderId) ? prev : [...prev, data.senderId];
+                                    } else {
+                                        return prev.filter(id => id !== data.senderId);
+                                    }
+                                });
                             }
                         } catch (e) {
                             console.error('Failed to parse signal message', e);
@@ -284,6 +301,9 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                     // Cleanup raised hands
                     setRaisedHands(prev => prev.filter(id => id !== userId));
 
+                    // Cleanup screen sharing
+                    setScreenSharingUsers(prev => prev.filter(id => id !== userId));
+
                     // Cleanup peer name
                     setPeerNames(prev => {
                         const newNames = { ...prev };
@@ -302,13 +322,13 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                 });
             };
 
-            if (socketRef.current?.connected) {
+            if (socket.connected) {
                 setupSocketListeners();
             } else {
-                socketRef.current?.on('connect', setupSocketListeners);
+                socket.on('connect', setupSocketListeners);
             }
 
-            socketRef.current?.on('connect_error', (err) => {
+            socket.on('connect_error', (err) => {
                 console.error('Signaling connection error:', err);
             });
         };
@@ -318,9 +338,10 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
         }
 
         return () => {
+            isActive = false;
             const currentPeers = peersRef.current;
             hasInitRef.current = false;
-            socketRef.current?.disconnect();
+            socket.disconnect();
             currentPeers.forEach(peer => peer.close());
             currentPeers.clear();
             if (screenStreamRef.current) {
@@ -351,6 +372,14 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
 
                 setLocalStream(screenStream);
                 setIsScreenSharing(true);
+
+                // Broadcast screen share start
+                const payload = JSON.stringify({ type: 'screen-share', sharing: true });
+                socketRef.current?.emit('chat-message', {
+                    message: `__SIGNAL__:${payload}`,
+                    roomId,
+                    senderName: username,
+                });
             } catch (err) {
                 console.error('Error starting screen share:', err);
             }
@@ -380,6 +409,14 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
 
             setLocalStream(videoStream);
             setIsScreenSharing(false);
+
+            // Broadcast screen share stop
+            const payload = JSON.stringify({ type: 'screen-share', sharing: false });
+            socketRef.current?.emit('chat-message', {
+                message: `__SIGNAL__:${payload}`,
+                roomId,
+                senderName: username,
+            });
         } catch (err) {
             console.error('Error stopping screen share and returning to video:', err);
         }
@@ -441,6 +478,7 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
         sendFile,
         toggleScreenShare,
         isScreenSharing,
+        screenSharingUsers,
         raisedHands,
         toggleHandRaise,
         emojiReactions,

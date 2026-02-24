@@ -13,7 +13,7 @@ import {
 
 const EMOJI_LIST = ['👍', '👎', '👏', '😂', '🎉', '😢', '🤔', '❤️'];
 
-const RemoteVideoTile = ({ stream, name, isHandRaised, isDark }: { stream: MediaStream, userId: string, name?: string, isHandRaised: boolean, isDark: boolean }) => {
+const RemoteVideoTile = ({ stream, name, isHandRaised, isDark, isPinned, onClick }: { stream: MediaStream, userId: string, name?: string, isHandRaised: boolean, isDark: boolean, isPinned: boolean, onClick: () => void }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
@@ -24,11 +24,13 @@ const RemoteVideoTile = ({ stream, name, isHandRaised, isDark }: { stream: Media
 
     return (
         <motion.div
+            layout
+            onClick={onClick}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.4 }}
-            className={`w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isHandRaised ? 'border-blue-500' : 'border-transparent'}`}
+            className={`cursor-pointer w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isHandRaised ? 'border-blue-500' : 'border-transparent'} ${isPinned ? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-[#202124]' : 'hover:border-blue-400'}`}
         >
             <video
                 ref={videoRef}
@@ -74,8 +76,27 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         toggleHandRaise,
         emojiReactions,
         sendEmoji,
-        peerNames
+        peerNames,
+        screenSharingUsers
     } = useWebRTC(roomId, username, hasSubmittedName);
+
+    const [pinnedUserId, setPinnedUserId] = useState<string | null>(null);
+
+    // Auto-pin someone if they start screen sharing
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (isScreenSharing) {
+                setPinnedUserId('local');
+            } else if (screenSharingUsers.length > 0) {
+                setPinnedUserId(screenSharingUsers[0]);
+            }
+        }, 0);
+        return () => clearTimeout(timeoutId);
+    }, [isScreenSharing, screenSharingUsers]);
+
+    const handlePinUser = (id: string) => {
+        setPinnedUserId(prev => prev === id ? null : id);
+    };
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -131,10 +152,25 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     const peerConnectedCount = remotePeers.length;
     const isMyHandRaised = raisedHands.includes('me');
 
-    // Grid classes based on participant count
+    // Layout Logic
+    const isAnyonePinned = pinnedUserId !== null;
     let gridClass = 'grid-cols-1 grid-rows-1';
-    if (peerConnectedCount === 1) gridClass = 'md:grid-cols-2 grid-cols-1';
-    else if (peerConnectedCount >= 2) gridClass = 'grid-cols-2 grid-rows-2';
+
+    if (!isAnyonePinned) {
+        if (peerConnectedCount === 1) gridClass = 'md:grid-cols-2 grid-cols-1';
+        else if (peerConnectedCount >= 2) gridClass = 'grid-cols-2 grid-rows-2';
+    } else {
+        gridClass = 'flex-1'; // Main area takes flexible space when a sidebar exists
+    }
+
+    // Determine which peers go where
+    const allPeers = [{ id: 'local', isLocal: true, stream: localStream }, ...remotePeers.map(([id, stream]) => ({ id, isLocal: false, stream }))];
+    const pinnedPeer = isAnyonePinned ? allPeers.find(p => p.id === pinnedUserId) : null;
+    // If pinnedPeer is null but someone IS pinned (e.g. they disconnected), fallback gracefully.
+    const actualPinnedId = pinnedPeer ? pinnedPeer.id : null;
+
+    // The sidebar peers are anyone NOT pinned.
+    const unpinnedPeers = allPeers.filter(p => p.id !== actualPinnedId);
 
     if (!hasSubmittedName) {
         return (
@@ -272,79 +308,159 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                         </AnimatePresence>
                     </div>
 
-                    {/* Grid Layout */}
-                    <motion.div
-                        layout
-                        className={`w-full h-full max-w-[1400px] grid gap-4 p-2 transition-all duration-300 ${gridClass}`}
-                    >
-                        {/* Always show Local Video as a grid item instead of PIP in Meet style if there are others, but for simplicity we can make it a prominent tile */}
+                    {/* Main Layout container */}
+                    <div className={`w-full h-full max-w-[1400px] flex ${isAnyonePinned ? 'flex-col md:flex-row gap-4' : ''}`}>
+
+                        {/* Center Stage / Grid */}
                         <motion.div
                             layout
-                            className={`w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'}`}
+                            className={`transition-all duration-300 ${isAnyonePinned ? 'flex-1 h-2/3 md:h-full relative' : `w-full h-full grid gap-4 p-2 ${gridClass}`}`}
                         >
-                            {localStream ? (
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff ? 'hidden' : ''}`}
-                                />
-                            ) : null}
-                            {(isVideoOff && !isScreenSharing) && (
-                                <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
-                                    <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center text-white text-3xl font-medium shadow-lg">
-                                        {username.charAt(0).toUpperCase()}
+                            {(!isAnyonePinned || actualPinnedId === 'local') && (
+                                <motion.div
+                                    layout
+                                    onClick={() => handlePinUser('local')}
+                                    className={`cursor-pointer w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'} ${actualPinnedId === 'local' ? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-[#202124]' : 'hover:border-blue-400'}`}
+                                >
+                                    {localStream ? (
+                                        <video
+                                            ref={localVideoRef}
+                                            autoPlay
+                                            playsInline
+                                            muted
+                                            className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
+                                        />
+                                    ) : null}
+                                    {(isVideoOff && !isScreenSharing) && (
+                                        <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
+                                            <div className={`${isAnyonePinned ? 'w-32 h-32 text-5xl' : 'w-24 h-24 text-3xl'} bg-blue-500 rounded-full flex items-center justify-center text-white font-medium shadow-lg transition-all`}>
+                                                {username.charAt(0).toUpperCase()}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isScreenSharing && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40">
+                                            <span className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-xl flex items-center">
+                                                <MonitorUp className="w-4 h-4 mr-2" />
+                                                You are presenting
+                                            </span>
+                                        </div>
+                                    )}
+                                    {isMyHandRaised && (
+                                        <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce z-20">
+                                            <Hand className="w-5 h-5 fill-current" />
+                                        </div>
+                                    )}
+                                    {isMuted && (
+                                        <div className="absolute top-4 right-4 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20">
+                                            <MicOff className="w-4 h-4" />
+                                        </div>
+                                    )}
+                                    <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg z-20 flex items-center space-x-2`}>
+                                        <span className="text-sm font-medium">{username} (You)</span>
                                     </div>
-                                </div>
+                                </motion.div>
                             )}
-                            {isScreenSharing && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40">
-                                    <span className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-xl flex items-center">
-                                        <MonitorUp className="w-4 h-4 mr-2" />
-                                        You are presenting
-                                    </span>
-                                </div>
+
+                            <AnimatePresence>
+                                {(!isAnyonePinned) && remotePeers.map(([userId, stream]) => (
+                                    <RemoteVideoTile
+                                        key={userId}
+                                        userId={userId}
+                                        stream={stream}
+                                        name={peerNames[userId]}
+                                        isHandRaised={raisedHands.includes(userId)}
+                                        isDark={isDark}
+                                        isPinned={false}
+                                        onClick={() => handlePinUser(userId)}
+                                    />
+                                ))}
+
+                                {/* If someone is pinned, and it's a remote user, show just them in the main area */}
+                                {isAnyonePinned && actualPinnedId !== 'local' && pinnedPeer && pinnedPeer.stream && (
+                                    <RemoteVideoTile
+                                        key={`pinned-${actualPinnedId}`}
+                                        userId={actualPinnedId!}
+                                        stream={pinnedPeer.stream}
+                                        name={peerNames[actualPinnedId!]}
+                                        isHandRaised={raisedHands.includes(actualPinnedId!)}
+                                        isDark={isDark}
+                                        isPinned={true}
+                                        onClick={() => handlePinUser(actualPinnedId!)}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Waiting Placeholder if nobody is connected and local is not pinned */}
+                            {peerConnectedCount === 0 && !isAnyonePinned && (
+                                <motion.div
+                                    className={`w-full h-full relative ${isDark ? 'bg-[#3C4043] border-white/5' : 'bg-white border-gray-200'} rounded-2xl shadow-xl border flex flex-col items-center justify-center`}
+                                >
+                                    <Users className={`w-16 h-16 mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+                                    <h2 className={`text-xl font-medium ${isDark ? 'text-white' : 'text-gray-800'}`}>Waiting for others to join</h2>
+                                    <p className={`mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Send them the room link to connect</p>
+                                </motion.div>
                             )}
-                            {isMyHandRaised && (
-                                <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce z-20">
-                                    <Hand className="w-5 h-5 fill-current" />
-                                </div>
-                            )}
-                            {isMuted && (
-                                <div className="absolute top-4 right-4 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20">
-                                    <MicOff className="w-4 h-4" />
-                                </div>
-                            )}
-                            <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg z-20`}>
-                                <span className="text-sm font-medium">{username} (You)</span>
-                            </div>
                         </motion.div>
 
-                        <AnimatePresence>
-                            {remotePeers.map(([userId, stream]) => (
-                                <RemoteVideoTile
-                                    key={userId}
-                                    userId={userId}
-                                    stream={stream}
-                                    name={peerNames[userId]}
-                                    isHandRaised={raisedHands.includes(userId)}
-                                    isDark={isDark}
-                                />
-                            ))}
-                        </AnimatePresence>
-
-                        {/* Waiting Placeholder if nobody is connected */}
-                        {peerConnectedCount === 0 && (
+                        {/* Sidebar strip for unpinned videos */}
+                        {isAnyonePinned && (
                             <motion.div
-                                className={`w-full h-full relative ${isDark ? 'bg-[#3C4043] border-white/5' : 'bg-white border-gray-200'} rounded-2xl shadow-xl border flex flex-col items-center justify-center`}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="h-1/3 md:h-full w-full md:w-64 lg:w-80 flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto pb-2 md:pb-0 scrollbar-hide"
                             >
-                                <Users className={`w-16 h-16 mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-                                <h2 className={`text-xl font-medium ${isDark ? 'text-white' : 'text-gray-800'}`}>Waiting for others to join</h2>
-                                <p className={`mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Send them the room link to connect</p>
+                                <AnimatePresence>
+                                    {unpinnedPeers.map(peer => {
+                                        if (peer.isLocal) {
+                                            return (
+                                                <motion.div
+                                                    key="local-sidebar"
+                                                    layout
+                                                    onClick={() => handlePinUser('local')}
+                                                    className={`cursor-pointer shrink-0 w-48 md:w-full h-32 md:h-48 relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-xl shadow-md overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'} hover:border-blue-400`}
+                                                >
+                                                    {localStream ? (
+                                                        <video
+                                                            ref={localVideoRef} // Note: React refs can only attach to one element. This might cause a visual glitch for local video PIP. We will fix this if needed, but standard HTML5 video allows multiple players of the same stream.
+                                                            autoPlay
+                                                            playsInline
+                                                            muted
+                                                            className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
+                                                        />
+                                                    ) : null}
+                                                    {(isVideoOff && !isScreenSharing) && (
+                                                        <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
+                                                            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-medium shadow-lg">
+                                                                {username.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className={`absolute bottom-2 left-2 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-2 py-1 rounded z-20`}>
+                                                        <span className="text-xs font-medium">You</span>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        } else {
+                                            return (
+                                                <div key={`sidebar-${peer.id}`} className="shrink-0 w-48 md:w-full h-32 md:h-48 relative">
+                                                    <RemoteVideoTile
+                                                        userId={peer.id}
+                                                        stream={peer.stream!}
+                                                        name={peerNames[peer.id]}
+                                                        isHandRaised={raisedHands.includes(peer.id)}
+                                                        isDark={isDark}
+                                                        isPinned={false}
+                                                        onClick={() => handlePinUser(peer.id)}
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                    })}
+                                </AnimatePresence>
                             </motion.div>
                         )}
-                    </motion.div>
+                    </div>
                 </div>
 
                 {/* Optional Chat Sidebar */}
