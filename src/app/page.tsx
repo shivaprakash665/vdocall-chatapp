@@ -1,158 +1,140 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Video, ArrowRight, Sparkles, Moon, Sun } from 'lucide-react';
+import { Video, Plus, Share2, ChevronRight, Check } from 'lucide-react';
+import Image from 'next/image';
 
 export default function LandingPage() {
-  const [name, setName] = useState('');
   const [roomId, setRoomId] = useState('');
-  const [isJoining, setIsJoining] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const [copied, setCopied] = useState(false);
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleCreateRoom = () => {
-    if (!name.trim()) return alert('Please enter your name');
     const newRoomId = uuidv4();
-    router.push(`/room/${newRoomId}?name=${encodeURIComponent(name.trim())}`);
+    router.push(`/room/${newRoomId}`);
   };
 
-  const handleJoinRoom = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !roomId.trim()) return alert('Please enter your name and a Room ID');
-    router.push(`/room/${roomId.trim()}?name=${encodeURIComponent(name.trim())}`);
+  const handleJoinRoom = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!roomId.trim()) return;
+    // Extract ID if a link is pasted
+    let finalId = roomId.trim();
+    if (finalId.includes('/room/')) {
+      finalId = finalId.split('/room/')[1];
+    }
+    router.push(`/room/${finalId}`);
+  };
+
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
+  // Static recent meeting ID for demo purposes
+  const demoRecentId = 'connecto-demo-room';
+
+  const copyRecentLink = () => {
+    if (typeof window === 'undefined') return;
+    const link = `${window.location.origin}/room/${demoRecentId}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const joinRecentRoom = () => {
+    router.push(`/room/${demoRecentId}`);
   };
 
   return (
-    <main className={`min-h-screen flex flex-col transition-colors duration-500 font-sans selection:bg-blue-500/30 relative overflow-hidden ${isDark ? 'bg-[#060913]' : 'bg-gray-50'}`}>
+    <main className="min-h-screen bg-white font-sans flex flex-col pt-12 text-slate-800">
+      {/* Top Section */}
+      <div className="flex-1 flex flex-col md:flex-row max-w-[1280px] mx-auto w-full px-6 lg:px-12 items-center justify-between gap-12 pt-6 lg:pt-16">
 
-      {/* Theme Toggle */}
-      <div className="absolute top-6 right-6 z-50">
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className={`p-3 rounded-full transition-all shadow-md flex items-center justify-center ${isDark ? 'bg-[#121622] text-[#8A93A6] border border-[#1F2633] hover:text-white' : 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200'}`}
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        >
-          {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
-        </button>
+        {/* Left Column */}
+        <div className="flex-1 max-w-[540px] space-y-8">
+          <h1 className="text-[44px] leading-tight font-bold text-slate-800">Connecto Video Meetings</h1>
+          <p className="text-[20px] text-slate-500 font-normal">Secure, fast and simple video calls for everyone.</p>
+
+          <div className="flex flex-col space-y-4 pt-2">
+            {/* Join a Meeting Button */}
+            <button
+              onClick={focusInput}
+              className="group flex items-center justify-start w-[320px] bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl px-6 py-4 transition-all"
+            >
+              <Video className="w-6 h-6 mr-5 fill-current stroke-current" />
+              <span className="font-medium text-lg tracking-wide">Join a Meeting</span>
+            </button>
+
+            {/* Create a Room Button */}
+            <button
+              onClick={handleCreateRoom}
+              className="group flex items-center justify-start w-[320px] bg-gradient-to-r from-[#2ca58d] to-[#2ca58d] hover:bg-[#258e7a] text-white rounded-xl px-6 py-4 shadow-[0_4px_14px_0_rgba(44,165,141,0.39)] hover:shadow-[0_6px_20px_rgba(44,165,141,0.23)] transition-all"
+            >
+              <div className="bg-white rounded-full flex items-center justify-center w-[26px] h-[26px] mr-5 shadow-sm">
+                <Plus className="w-5 h-5 text-[#2ca58d] stroke-[4]" />
+              </div>
+              <span className="font-medium text-lg tracking-wide">Create a Room</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column (Grid) */}
+        <div className="flex-1 w-full flex justify-end pb-8">
+          <div className="bg-white p-2 sm:p-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 grid grid-cols-3 gap-2 sm:gap-3 w-full max-w-[640px]">
+            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=300&fit=crop" alt="User 1" className="w-full aspect-[4/3] object-cover rounded-xl" />
+            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=300&fit=crop" alt="User 2" className="w-full aspect-[4/3] object-cover rounded-xl" />
+            <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=300&fit=crop" alt="User 3" className="w-full aspect-[4/3] object-cover rounded-xl" />
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop" alt="User 4" className="w-full aspect-[4/3] object-cover rounded-xl" />
+            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=300&fit=crop" alt="User 5" className="w-full aspect-[4/3] object-cover rounded-xl" />
+            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=300&fit=crop" alt="User 6" className="w-full aspect-[4/3] object-cover rounded-xl" />
+          </div>
+        </div>
+
       </div>
 
-      {/* Decorative Background Elements */}
-      <div className={`absolute top-[10%] left-[20%] w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-colors duration-1000 ${isDark ? 'bg-[#18347D]/20' : 'bg-blue-400/20'}`} />
-      <div className={`absolute bottom-[10%] right-[20%] w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-colors duration-1000 ${isDark ? 'bg-[#2E1452]/20' : 'bg-purple-400/20'}`} />
+      {/* Bottom Section */}
+      <div className="border-t border-gray-100 mt-8 sm:mt-16 bg-[#fafafa] w-full py-10 flex-col flex-1">
+        <div className="max-w-[1280px] mx-auto w-full px-6 lg:px-12 space-y-6">
+          <h2 className="text-slate-600 font-semibold text-[17px]">Recent Meetings</h2>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className={`max-w-[420px] w-full rounded-[28px] p-8 md:p-10 space-y-8 relative z-10 transition-colors duration-500 border ${isDark ? 'bg-[#121622] border-[#222836] shadow-2xl shadow-black/50' : 'bg-white border-gray-200 shadow-xl'}`}
-        >
-          <div className="text-center space-y-4">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="w-16 h-16 bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] rounded-2xl mx-auto flex items-center justify-center shadow-[0_0_40px_rgba(42,101,255,0.3)] mb-6"
-            >
-              <Video className="w-8 h-8 text-white" />
-            </motion.div>
-            <h1 className={`text-[32px] font-bold tracking-tight transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>Connecto</h1>
-            <p className={`text-[15px] font-medium transition-colors ${isDark ? 'text-[#8A93A6]' : 'text-gray-600'}`}>Secure, peer-to-peer video calls.</p>
-          </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
 
-          <div className="space-y-6 pt-4">
-            <div className="space-y-3">
-              <label htmlFor="name" className={`block text-[11px] font-bold uppercase tracking-[0.15em] pl-1 transition-colors ${isDark ? 'text-[#60697A]' : 'text-gray-500'}`}>
-                Your Display Name
-              </label>
+            {/* Input Group */}
+            <form onSubmit={handleJoinRoom} className="flex items-center gap-3 w-full md:w-auto">
               <input
+                ref={inputRef}
                 type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={`w-full px-5 py-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-medium border ${isDark ? 'bg-[#060913] border-[#1F2633] text-white placeholder-[#4A5568] hover:border-[#323D52]' : 'bg-black/5 border-gray-200 text-gray-900 placeholder-gray-400 hover:border-gray-300'}`}
-                placeholder="e.g. Alex"
-                autoComplete="off"
+                value={roomId}
+                onChange={e => setRoomId(e.target.value)}
+                className="bg-white sm:bg-[#f6f7f9] border border-gray-200 text-gray-800 text-[15px] rounded-xl px-5 py-3 w-full sm:w-[360px] outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400 transition"
+                placeholder="Enter a code or link"
               />
+              <button type="submit" className="bg-blue-500 text-white font-medium px-8 py-3 rounded-xl hover:bg-blue-600 transition shadow-sm">
+                Join
+              </button>
+            </form>
+
+            {/* Recent Meeting Card */}
+            <div className="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-[0_2px_8px_rgb(0,0,0,0.04)] space-x-2 lg:space-x-4 text-[14px] md:ml-auto w-full md:w-auto overflow-hidden">
+              <button type="button" onClick={copyRecentLink} className="flex items-center text-slate-500 hover:text-slate-800 font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition gap-2.5 outline-none focus:ring-2 focus:ring-slate-200">
+                {copied ? <Check className="w-[18px] h-[18px] text-green-500" /> : <Share2 className="w-[18px] h-[18px] text-slate-400" />}
+                <span>{copied ? 'Copied!' : 'Copy Invite Link'}</span>
+                <ChevronRight className="w-[18px] h-[18px] text-slate-300 ml-1" />
+              </button>
+
+              <div className="w-[1px] h-6 bg-gray-200 hidden sm:block"></div>
+
+              <button type="button" onClick={joinRecentRoom} className="flex items-center text-slate-500 hover:text-slate-800 font-medium px-3 py-2 rounded-lg hover:bg-slate-50 transition gap-2.5 pr-2 outline-none focus:ring-2 focus:ring-slate-200">
+                <Video className="w-[18px] h-[18px] text-slate-400 fill-current" />
+                <span>Join</span>
+                <ChevronRight className="w-[18px] h-[18px] text-slate-300 ml-1" />
+              </button>
             </div>
 
-            <div className={`grid grid-cols-2 gap-2 p-1.5 rounded-xl border transition-colors ${isDark ? 'bg-[#060913] border-[#1F2633]' : 'bg-gray-100/50 border-gray-200'}`}>
-              <button
-                onClick={() => setIsJoining(false)}
-                className={`py-3 rounded-lg text-[14px] font-medium transition-all duration-300 ${!isJoining ? (isDark ? 'bg-[#242A38] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : (isDark ? 'text-[#60697A] hover:text-[#A0AABA] hover:bg-transparent' : 'text-gray-500 hover:text-gray-700 hover:bg-black/5')}`}
-              >
-                Create Room
-              </button>
-              <button
-                onClick={() => setIsJoining(true)}
-                className={`py-3 rounded-lg text-[14px] font-medium transition-all duration-300 ${isJoining ? (isDark ? 'bg-[#242A38] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : (isDark ? 'text-[#60697A] hover:text-[#A0AABA] hover:bg-transparent' : 'text-gray-500 hover:text-gray-700 hover:bg-black/5')}`}
-              >
-                Join Room
-              </button>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {isJoining ? (
-                <motion.form
-                  key="join"
-                  initial={{ opacity: 0, height: 0, y: -10 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -10 }}
-                  onSubmit={handleJoinRoom}
-                  className="space-y-4"
-                >
-                  <div className="space-y-3">
-                    <label htmlFor="roomId" className={`block text-[11px] font-bold uppercase tracking-[0.15em] pl-1 transition-colors ${isDark ? 'text-[#60697A]' : 'text-gray-500'}`}>
-                      Room ID
-                    </label>
-                    <input
-                      type="text"
-                      id="roomId"
-                      value={roomId}
-                      onChange={(e) => setRoomId(e.target.value)}
-                      className={`w-full px-5 py-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm border ${isDark ? 'bg-[#060913] border-[#1F2633] text-white placeholder-[#4A5568] hover:border-[#323D52]' : 'bg-black/5 border-gray-200 text-gray-900 placeholder-gray-400 hover:border-gray-300'}`}
-                      placeholder="Paste ID here"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="submit"
-                    className="w-full py-4 text-[15px] rounded-xl bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] text-white font-semibold tracking-wide shadow-[0_8px_30px_rgba(42,101,255,0.2)] hover:shadow-[0_8px_30px_rgba(42,101,255,0.4)] transition-all flex items-center justify-center space-x-2"
-                  >
-                    <span>Join Call</span>
-                    <ArrowRight className="w-[18px] h-[18px]" />
-                  </motion.button>
-                </motion.form>
-              ) : (
-                <motion.div
-                  key="create"
-                  initial={{ opacity: 0, height: 0, y: 10 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: 10 }}
-                >
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleCreateRoom}
-                    className="w-full py-4 text-[15px] rounded-xl bg-gradient-to-b from-[#3A76FF] to-[#1D54FF] text-white font-semibold tracking-wide shadow-[0_8px_30px_rgba(42,101,255,0.2)] hover:shadow-[0_8px_30px_rgba(42,101,255,0.4)] transition-all flex items-center justify-center space-x-2"
-                  >
-                    <Sparkles className="w-[18px] h-[18px]" />
-                    <span>Start New Call</span>
-                  </motion.button>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
-
-          <p className={`text-center text-[11px] font-medium pt-8 border-t transition-colors ${isDark ? 'text-[#60697A] border-[#1F2633]' : 'text-gray-400 border-gray-200'}`}>
-            Peer-to-peer connection • No data stored on servers
-          </p>
-        </motion.div>
+        </div>
       </div>
     </main>
   );
