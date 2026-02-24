@@ -151,7 +151,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                                 </button>
                                 <a
-                                    href={`https://wa.me/?text=${encodeURIComponent(`Join my secure WebRTC Video Call! Room ID: ${roomId}\n\nJoin here: ${typeof window !== 'undefined' ? window.location.origin : ''}/room/${roomId}`)}`}
+                                    href={`https://wa.me/?text=${encodeURIComponent(`Join my video call!\n\nRoom ID: ${roomId}\n\nClick here to join directly: ${typeof window !== 'undefined' ? window.location.origin : ''}/room/${roomId}`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-1.5 hover:bg-green-100 rounded text-green-600 transition"
