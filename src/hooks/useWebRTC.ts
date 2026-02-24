@@ -53,8 +53,12 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
     const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
     const screenStreamRef = useRef<MediaStream | null>(null);
     const iceCandidateQueuesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+    const hasInitRef = useRef(false);
 
     useEffect(() => {
+        if (!roomId || !shouldConnect || hasInitRef.current) return;
+        hasInitRef.current = true;
+
         const signalingUrl = process.env.NEXT_PUBLIC_SIGNALING_URL ||
             (typeof window !== 'undefined'
                 ? `http://${window.location.hostname}:5000`
@@ -309,19 +313,21 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
             });
         };
 
-        if (roomId && shouldConnect && joinState === 'idle') {
+        if (roomId && shouldConnect) {
             init();
         }
 
         return () => {
+            const currentPeers = peersRef.current;
+            hasInitRef.current = false;
             socketRef.current?.disconnect();
-            peersRef.current.forEach(peer => peer.close());
-            peersRef.current.clear();
+            currentPeers.forEach(peer => peer.close());
+            currentPeers.clear();
             if (screenStreamRef.current) {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
             }
         };
-    }, [roomId, username, shouldConnect, joinState]);
+    }, [roomId, username, shouldConnect]);
 
     const toggleScreenShare = async () => {
         if (!isScreenSharing) {
