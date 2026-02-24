@@ -55,12 +55,12 @@ export default function LandingPage() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/30 mb-6"
+              className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/30 mb-6"
             >
               <Video className="w-8 h-8 text-white" />
             </motion.div>
-            <h1 className={`text-3xl font-bold tracking-tight transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>Connect instantly.</h1>
-            <p className={`font-medium transition-colors ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Secure, peer-to-peer video calls and chat designed for privacy.</p>
+            <h1 className={`text-4xl font-extrabold tracking-tight transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>Connecto</h1>
+            <p className={`font-medium transition-colors ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Secure, peer-to-peer video calls.</p>
           </div>
 
           <div className="space-y-6 pt-4">
@@ -139,7 +139,7 @@ export default function LandingPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCreateRoom}
-                    className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold tracking-wide shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all flex items-center justify-center space-x-2"
+                    className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold tracking-wide shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all flex items-center justify-center space-x-2"
                   >
                     <Sparkles className="w-5 h-5" />
                     <span>Start New Call</span>
