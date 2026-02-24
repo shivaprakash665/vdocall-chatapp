@@ -50,6 +50,62 @@ const RemoteVideoTile = ({ stream, name, isHandRaised, isDark, isPinned, onClick
     );
 };
 
+const LocalVideoTile = ({ stream, isVideoOff, isDark, username, isScreenSharing, isMyHandRaised, isMuted, isPinned, onClick, className }: { stream: MediaStream | null, isVideoOff: boolean, isDark: boolean, username: string, isScreenSharing: boolean, isMyHandRaised: boolean, isMuted: boolean, isPinned: boolean, onClick: () => void, className?: string }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
+
+    return (
+        <motion.div
+            layout
+            onClick={onClick}
+            className={`cursor-pointer w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'} ${isPinned ? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-[#202124]' : 'hover:border-blue-400'} ${className || ''}`}
+        >
+            {stream ? (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
+                />
+            ) : null}
+            {(isVideoOff && !isScreenSharing) && (
+                <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
+                    <div className={`${isPinned ? 'w-32 h-32 text-5xl' : 'w-24 h-24 text-3xl'} bg-blue-500 rounded-full flex items-center justify-center text-white font-medium shadow-lg transition-all`}>
+                        {username.charAt(0).toUpperCase()}
+                    </div>
+                </div>
+            )}
+            {isScreenSharing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40">
+                    <span className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-xl flex items-center">
+                        <MonitorUp className="w-4 h-4 mr-2" />
+                        You are presenting
+                    </span>
+                </div>
+            )}
+            {isMyHandRaised && (
+                <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce z-20">
+                    <Hand className="w-5 h-5 fill-current" />
+                </div>
+            )}
+            {isMuted && (
+                <div className="absolute top-4 right-4 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20">
+                    <MicOff className="w-4 h-4" />
+                </div>
+            )}
+            <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg z-20 flex items-center space-x-2`}>
+                <span className="text-sm font-medium">{username} (You)</span>
+            </div>
+        </motion.div>
+    );
+};
+
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -123,10 +179,14 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     }, []);
 
     useEffect(() => {
-        if (localVideoRef.current && localStream) {
-            localVideoRef.current.srcObject = localStream;
-        }
-    }, [localStream, joinState]);
+        const updateTime = () => {
+            const now = new Date();
+            setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        };
+        updateTime();
+        const interval = setInterval(updateTime, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleAudioToggle = () => {
         if (localStream) {
@@ -317,49 +377,17 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                             className={`transition-all duration-300 ${isAnyonePinned ? 'flex-1 h-2/3 md:h-full relative' : `w-full h-full grid gap-4 p-2 ${gridClass}`}`}
                         >
                             {(!isAnyonePinned || actualPinnedId === 'local') && (
-                                <motion.div
-                                    layout
+                                <LocalVideoTile
+                                    stream={localStream}
+                                    isVideoOff={isVideoOff}
+                                    isDark={isDark}
+                                    username={username}
+                                    isScreenSharing={isScreenSharing}
+                                    isMyHandRaised={isMyHandRaised}
+                                    isMuted={isMuted}
+                                    isPinned={actualPinnedId === 'local'}
                                     onClick={() => handlePinUser('local')}
-                                    className={`cursor-pointer w-full h-full relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-2xl shadow-xl overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'} ${actualPinnedId === 'local' ? 'ring-4 ring-blue-500 ring-offset-2 ring-offset-[#202124]' : 'hover:border-blue-400'}`}
-                                >
-                                    {localStream ? (
-                                        <video
-                                            ref={localVideoRef}
-                                            autoPlay
-                                            playsInline
-                                            muted
-                                            className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
-                                        />
-                                    ) : null}
-                                    {(isVideoOff && !isScreenSharing) && (
-                                        <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
-                                            <div className={`${isAnyonePinned ? 'w-32 h-32 text-5xl' : 'w-24 h-24 text-3xl'} bg-blue-500 rounded-full flex items-center justify-center text-white font-medium shadow-lg transition-all`}>
-                                                {username.charAt(0).toUpperCase()}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {isScreenSharing && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40">
-                                            <span className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-xl flex items-center">
-                                                <MonitorUp className="w-4 h-4 mr-2" />
-                                                You are presenting
-                                            </span>
-                                        </div>
-                                    )}
-                                    {isMyHandRaised && (
-                                        <div className="absolute top-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg animate-bounce z-20">
-                                            <Hand className="w-5 h-5 fill-current" />
-                                        </div>
-                                    )}
-                                    {isMuted && (
-                                        <div className="absolute top-4 right-4 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20">
-                                            <MicOff className="w-4 h-4" />
-                                        </div>
-                                    )}
-                                    <div className={`absolute bottom-4 left-4 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-3 py-1.5 rounded-lg z-20 flex items-center space-x-2`}>
-                                        <span className="text-sm font-medium">{username} (You)</span>
-                                    </div>
-                                </motion.div>
+                                />
                             )}
 
                             <AnimatePresence>
@@ -414,32 +442,20 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     {unpinnedPeers.map(peer => {
                                         if (peer.isLocal) {
                                             return (
-                                                <motion.div
-                                                    key="local-sidebar"
-                                                    layout
-                                                    onClick={() => handlePinUser('local')}
-                                                    className={`cursor-pointer shrink-0 w-48 md:w-full h-32 md:h-48 relative ${isDark ? 'bg-[#3C4043]' : 'bg-gray-300'} rounded-xl shadow-md overflow-hidden border-2 transition-colors ${isMyHandRaised ? 'border-blue-500' : 'border-transparent'} hover:border-blue-400`}
-                                                >
-                                                    {localStream ? (
-                                                        <video
-                                                            ref={localVideoRef} // Note: React refs can only attach to one element. This might cause a visual glitch for local video PIP. We will fix this if needed, but standard HTML5 video allows multiple players of the same stream.
-                                                            autoPlay
-                                                            playsInline
-                                                            muted
-                                                            className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
-                                                        />
-                                                    ) : null}
-                                                    {(isVideoOff && !isScreenSharing) && (
-                                                        <div className={`absolute inset-0 flex items-center justify-center ${isDark ? 'bg-[#3C4043]' : 'bg-gray-200'}`}>
-                                                            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-medium shadow-lg">
-                                                                {username.charAt(0).toUpperCase()}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    <div className={`absolute bottom-2 left-2 ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'} backdrop-blur-md px-2 py-1 rounded z-20`}>
-                                                        <span className="text-xs font-medium">You</span>
-                                                    </div>
-                                                </motion.div>
+                                                <div key="local-sidebar" className="shrink-0 w-48 md:w-full h-32 md:h-48 relative">
+                                                    <LocalVideoTile
+                                                        stream={localStream}
+                                                        isVideoOff={isVideoOff}
+                                                        isDark={isDark}
+                                                        username={username}
+                                                        isScreenSharing={isScreenSharing}
+                                                        isMyHandRaised={isMyHandRaised}
+                                                        isMuted={isMuted}
+                                                        isPinned={false}
+                                                        onClick={() => handlePinUser('local')}
+                                                        className="rounded-xl shadow-md h-full w-full"
+                                                    />
+                                                </div>
                                             );
                                         } else {
                                             return (
