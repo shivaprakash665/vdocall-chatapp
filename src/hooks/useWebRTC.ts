@@ -40,7 +40,7 @@ export const useWebRTC = (roomId: string, username: string) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
-    const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string }[]>([]);
+    const [emojiReactions, setEmojiReactions] = useState<{ id: string, emoji: string, senderId: string, senderName: string, x?: number }[]>([]);
     const [peerNames, setPeerNames] = useState<Record<string, string>>({});
     const peerNamesRef = useRef<Record<string, string>>({});
 
@@ -220,7 +220,7 @@ export const useWebRTC = (roomId: string, username: string) => {
                                     }
                                 });
                             } else if (payload.type === 'emoji') {
-                                const newEmoji = { id: crypto.randomUUID(), emoji: payload.emoji, senderId: data.senderId, senderName: data.senderName };
+                                const newEmoji = { id: crypto.randomUUID(), emoji: payload.emoji, senderId: data.senderId, senderName: data.senderName, x: Math.random() * 100 - 50 };
                                 setEmojiReactions(prev => [...prev, newEmoji]);
                                 // Auto remove emoji after 3 seconds
                                 setTimeout(() => {
@@ -374,7 +374,7 @@ export const useWebRTC = (roomId: string, username: string) => {
         const payload = JSON.stringify({ type: 'emoji', emoji });
         const data: Message = { message: `__SIGNAL__:${payload}`, roomId, senderName: username, senderId: 'me' };
         socketRef.current?.emit('chat-message', { ...data, senderId: undefined });
-        const newEmoji = { id: crypto.randomUUID(), emoji, senderId: 'me', senderName: username };
+        const newEmoji = { id: crypto.randomUUID(), emoji, senderId: 'me', senderName: username, x: Math.random() * 100 - 50 };
         setEmojiReactions(prev => [...prev, newEmoji]);
         setTimeout(() => {
             setEmojiReactions(prev => prev.filter(e => e.id !== newEmoji.id));

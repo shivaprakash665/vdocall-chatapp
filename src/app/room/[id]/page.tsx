@@ -82,7 +82,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     // Theme state
     const [isDark, setIsDark] = useState(true);
 
+    const [origin, setOrigin] = useState('');
+
     useEffect(() => {
+        setOrigin(window.location.origin);
         const updateTime = () => {
             const now = new Date();
             setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -151,7 +154,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                                     {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                                 </button>
                                 <a
-                                    href={`https://wa.me/?text=${encodeURIComponent(`Join my video call!\n\nRoom ID: ${roomId}\n\nClick here to join directly: ${typeof window !== 'undefined' ? window.location.origin : ''}/room/${roomId}`)}`}
+                                    href={`https://wa.me/?text=${encodeURIComponent(`Join my video call!\n\nRoom ID: ${roomId}\n\nClick here to join directly: ${origin}/room/${roomId}`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-1.5 hover:bg-green-100 rounded text-green-600 transition"
@@ -179,7 +182,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                             {emojiReactions.map(reaction => (
                                 <motion.div
                                     key={reaction.id}
-                                    initial={{ opacity: 0, y: '100%', scale: 0.5, x: Math.random() * 100 - 50 }}
+                                    initial={{ opacity: 0, y: '100%', scale: 0.5, x: reaction.x || 0 }}
                                     animate={{ opacity: [0, 1, 1, 0], y: ['50%', '0%', '-50%', '-100%'], scale: [0.5, 1.5, 1.5, 0.8] }}
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 2.5, ease: "easeOut" }}
