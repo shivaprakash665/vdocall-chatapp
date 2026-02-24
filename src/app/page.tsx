@@ -82,40 +82,40 @@ export default function LandingPage() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center p-6 lg:mr-[180px]">
-          <div className="max-w-[650px] w-full text-center space-y-4">
-            <h1 className="text-[44px] sm:text-[48px] leading-tight text-gray-900 tracking-normal mb-6">
+          <div className="max-w-[750px] w-full text-center space-y-2 mb-8">
+            <h1 className="text-[44px] sm:text-[52px] leading-[1.2] text-[#1f2937] font-normal tracking-wide mb-6">
               Video calls and meetings for<br />everyone
             </h1>
-            <p className="text-[18px] text-gray-600 mb-10 max-w-xl mx-auto">
+            <p className="text-[18px] sm:text-[22px] text-[#5f6368] mb-12 max-w-2xl mx-auto font-normal">
               Connect, collaborate, and celebrate from anywhere with Google Meet
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
               <button
                 onClick={handleCreateRoom}
-                className="w-full sm:w-auto px-6 py-3.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-md font-medium text-[15px] transition-colors shadow-sm flex items-center justify-center space-x-2"
+                className="w-full sm:w-auto px-6 py-[14px] bg-[#1a73e8] hover:bg-[#1b6ad3] text-white rounded-[4px] font-medium text-[15px] transition-colors shadow-sm flex items-center justify-center space-x-2"
               >
-                <Video className="w-5 h-5" />
+                <Video className="w-[18px] h-[18px]" strokeWidth={2.2} />
                 <span>New meeting</span>
               </button>
 
-              <form onSubmit={handleJoinRoom} className="flex w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
+              <form onSubmit={handleJoinRoom} className="flex w-full sm:w-auto mt-2 sm:mt-0">
+                <div className="relative flex-1 sm:w-[280px]">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Keyboard className="h-5 w-5 text-gray-500" />
+                    <Keyboard className="h-5 w-5 text-[#5f6368]" strokeWidth={1.5} />
                   </div>
                   <input
                     type="text"
                     value={roomId}
                     onChange={(e) => setRoomId(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 border border-gray-400 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-md focus:outline-none transition-all text-gray-800 placeholder-gray-500 text-[15px]"
+                    className="w-full pl-11 pr-4 py-[14px] border border-gray-400 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] rounded-[4px] focus:outline-none transition-all text-[#3c4043] placeholder-[#5f6368] text-[16px]"
                     placeholder="Enter a code or link"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={!roomId.trim()}
-                  className={`ml-2 px-4 py-3.5 rounded-md font-medium text-[15px] transition-colors ${roomId.trim() ? 'text-[#1a73e8] hover:bg-blue-50' : 'text-gray-400 bg-transparent'}`}
+                  className={`ml-2 px-6 py-[14px] rounded-[4px] font-medium text-[15px] transition-colors ${roomId.trim() ? 'text-[#1a73e8] hover:bg-[#f3f7fe]' : 'text-[#9aa0a6] bg-transparent'}`}
                 >
                   Join
                 </button>
