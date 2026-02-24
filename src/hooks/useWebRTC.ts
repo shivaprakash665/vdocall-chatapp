@@ -204,23 +204,23 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                     setJoinState('waiting');
                 });
 
-                socketRef.current?.on('room-joined', (data: { isHost: boolean, roomId: string }) => {
+                socket.on('room-joined', (data: { isHost: boolean, roomId: string }) => {
                     setJoinState('joined');
                     setIsHost(data.isHost);
                     // Introduce ourselves to anyone already in the room
                     broadcastUserInfo();
                 });
 
-                socketRef.current?.on('guest-denied', () => {
+                socket.on('guest-denied', () => {
                     setJoinState('denied');
                 });
 
-                socketRef.current?.on('guest-knocking', (data: { guestId: string, guestName: string }) => {
+                socket.on('guest-knocking', (data: { guestId: string, guestName: string }) => {
                     setKnockingGuests(prev => [...prev, { id: data.guestId, name: data.guestName }]);
                 });
 
                 // When a new user connects (AFTER being accepted), EXISTING users in the room will initiate a call to them
-                socketRef.current?.on('user-connected', (userId: string) => {
+                socket.on('user-connected', (userId: string) => {
                     setMessages(prev => [...prev, { message: 'A user joined the room', senderName: 'System', senderId: 'system' }]);
 
                     // The new user might not know our name yet, so re-broadcast our info when someone joins
@@ -233,19 +233,19 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                     }
                 });
 
-                socketRef.current?.on('offer', async ({ offer, senderId }: { offer: RTCSessionDescriptionInit, senderId: string }) => {
+                socket.on('offer', async ({ offer, senderId }: { offer: RTCSessionDescriptionInit, senderId: string }) => {
                     await handleOffer(offer, senderId, stream);
                 });
 
-                socketRef.current?.on('answer', async ({ answer, senderId }: { answer: RTCSessionDescriptionInit, senderId: string }) => {
+                socket.on('answer', async ({ answer, senderId }: { answer: RTCSessionDescriptionInit, senderId: string }) => {
                     await handleAnswer(answer, senderId);
                 });
 
-                socketRef.current?.on('ice-candidate', ({ candidate, senderId }: { candidate: RTCIceCandidateInit, senderId: string }) => {
+                socket.on('ice-candidate', ({ candidate, senderId }: { candidate: RTCIceCandidateInit, senderId: string }) => {
                     handleNewICECandidate(candidate, senderId);
                 });
 
-                socketRef.current?.on('chat-message', (data: Message) => {
+                socket.on('chat-message', (data: Message) => {
                     if (data.message.startsWith('__SIGNAL__:')) {
                         try {
                             const payload = JSON.parse(data.message.replace('__SIGNAL__:', ''));
@@ -287,7 +287,7 @@ export const useWebRTC = (roomId: string, username: string, shouldConnect: boole
                     }
                 });
 
-                socketRef.current?.on('user-disconnected', (userId: string) => {
+                socket.on('user-disconnected', (userId: string) => {
                     const disconnectedName = peerNamesRef.current[userId] || 'A user';
                     setMessages(prev => [...prev, { message: `${disconnectedName} left the room`, senderName: 'System', senderId: 'system' }]);
 
